@@ -32,7 +32,7 @@ def load_and_analyze_data(uploaded_file):
     
     return df, export_mean, export_std, retour_mean, retour_std, p_value_export, p_value_retour
 
-def main(uploaded_file):
+def load_data(uploaded_file):
     if uploaded_file is not None:
         result = load_and_analyze_data(uploaded_file)
         

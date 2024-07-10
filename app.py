@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 from utils import simulate_, plot_cdf, plot_3_scenarios, plot_return_probs, plot_shipping_demands, specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags
 
 def load_excel_data():
-    from fleetOptimisation.excel_based_solution import main
+    from excel_based_solution import load_data
     st.title("Analyse de données d'expédition")
     uploaded_file = st.file_uploader("Choisissez un fichier Excel ou CSV", type=["xlsx", "csv"])
     if uploaded_file is not None:
-        mu_client, sigma_client, mu_reverse, sigma_reverse = main(uploaded_file)
+        mu_client, sigma_client, mu_reverse, sigma_reverse = load_data(uploaded_file)
         return (mu_client, sigma_client), (mu_reverse, sigma_reverse)
     return None, None
 
