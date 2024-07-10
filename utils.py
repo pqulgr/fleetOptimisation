@@ -3,7 +3,6 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.stats import norm
-from tqdm import tqdm
 
 def f_option_1(params, returns, demand):
     cost_dem = params["cost_per_demand"]
@@ -49,7 +48,7 @@ def simulate_(n_sim, n_days, params_client, params_reverse, reverse_time, cost_o
 
     progress_bar = st.empty()
         
-    for i in tqdm(range(n_sim)):
+    for i in range(n_sim):
         progress_bar.progress((i + 1) / n_sim)
 
         stock_warehouse = np.zeros(n_days)
@@ -186,7 +185,7 @@ def specific_fonction_for_accurately_determine_the_cost_of_the_recommended_numbe
         progress_bar.progress((i + 1) / len(y))
         cost_params["nb_emballages"] = item
             
-        for j in tqdm(range(n_sim)):
+        for j in range(n_sim):
 
             pending_returns = np.zeros(n_days_sim)
             available_returns = np.zeros(n_days_sim)  # New array to track available returns
