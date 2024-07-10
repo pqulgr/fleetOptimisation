@@ -101,6 +101,7 @@ def main():
     seuil_confiance = st.number_input("Seuil de confiance (en %)", min_value=0.0, max_value=100.0, value=95.0) / 100.0
     
     if excel_based:
+        cost_params["reverse_time"] = st.number_input("Délai du retour des camions (reverse)", value=1.0)
         params_client, params_reverse = load_excel_data()
     else:
         params_client, params_reverse = get_manual_inputs()
