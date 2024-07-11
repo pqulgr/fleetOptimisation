@@ -12,10 +12,10 @@ def load_excel_data():
     return None, None
 
 def get_manual_inputs():
-    mu_client = st.number_input("Moyenne de la quantité d'exports (entrepôt)", value=2.0)
-    sigma_client = st.number_input("Ecart-type demande (entrepôt)", value=1.0)
-    mu_reverse = st.number_input("Moyenne du nombre de jours écoulés avant disponibilité (reverse)", value=10.0)
-    sigma_reverse = st.number_input("Ecart-type du nombre de jours écoulés avant disponibilité (reverse)", value=1.0)
+    mu_client = st.number_input("Moyenne du nombre d'expédition par jour (entrepôt)", value=2.0)
+    sigma_client = st.number_input("Ecart-type du nombre d'expédition par jour (entrepôt)", value=1.0)
+    mu_reverse = st.number_input("Moyenne du délai de restitution (disponibilité de l'emballage)", value=10.0)
+    sigma_reverse = st.number_input("Ecart-type du délai de restitution (disponibilité de l'emballage)", value=1.0)
     return (mu_client, sigma_client), (mu_reverse, sigma_reverse)
 
 def get_cost_options():
@@ -25,13 +25,13 @@ def get_cost_options():
     if cost_options:
         cost_option = st.selectbox("Sélectionnez une option de coût", ("Option 1", "Option 2"))
         if cost_option == "Option 1":
-            cost_params["reverse_time"] = st.slider("Délai du retour des camions (reverse)", min_value=1, max_value=20, value=(1,1), step=1, label_visibility="visible")
+            cost_params["reverse_time"] = st.slider("Délai avant reverse. Nombre de jours avant que tout les emballages dosponibles soient récupérés", min_value=1, max_value=20, value=(1,1), step=1, label_visibility="visible")
             cost_params["nb_locations"] = st.number_input("Nombre de destinations", min_value=0.0, step=1., value=1.0)
             cost_params["cost_emballage"] = st.number_input("Coût d'achat des emballages", min_value=0.0, step=0.01, value=2.0)
             cost_params["cost_location"] = st.number_input("Coût de récupération à un point relai", min_value=0.0, step=0.1, value=5.0)
             cost_params["cost_per_demand"] = st.number_input("Coût par envoi", min_value=0.0, step=0.1, value=1.0)
         elif cost_option == "Option 2":
-            cost_params["reverse_time"] = st.number_input("Délai du retour des camions (reverse)", value=1.0)
+            cost_params["reverse_time"] = st.number_input("Délai avant reverse. Nombre de jours avant que tout les emballages dosponibles soient récupérés", value=1.0)
             cost_params["cost_emballage"] = st.number_input("Coût d'achat des emballages", min_value=0.0, step=0.01, value=2.0)
             cost_params["poids_sac"] = st.number_input("Poids moyen", min_value=0.0, step=0.1, value=1.0)
             cost_params["cost_per_demand"] = st.number_input("Coût par envoi par Kg", min_value=0.0, step=0.1, value=1.0)
