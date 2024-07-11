@@ -1,7 +1,7 @@
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
-from utils import simulate_, plot_cdf, plot_3_scenarios, plot_return_probs, plot_shipping_demands, specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags
+from utils import simulate_, plot_cdf, plot_3_scenarios, plot_return_probs, plot_shipping_demands, specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags, plot_cost_vs_reverse
 
 def load_excel_data():
     from excel_based_solution import load_data
@@ -54,17 +54,10 @@ def run_simulation(n_simulations, n_jours, params_client, params_reverse, cost_o
             y.append(costs.get(str(seuil_x)))
         
         y = np.array(specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags(
-            y, cost_params, 50, params_reverse, params_client, n_jours
+            y, cost_params, 50, params_reverse, params_client, n_jours, cost_option
         ))
 
-
-        fig, ax = plt.subplots()
-        ax.plot(range(reverse_time[0],reverse_time[1]+1), y)
-        ax.set_xlabel('reverse')
-        ax.set_ylabel('coût')
-        ax.set_title('Distribution des coûts totaux')
-        plt.tight_layout()
-        st.pyplot(fig)
+        plot_cost_vs_reverse(range(reverse_time[0], reverse_time[1]+1), y)
     elif cost_option=="Option 2":
         results, resultats_3_simulations, demand_scenarios, returns_scenarios, return_probs, shipping_demands, costs = simulate_(
             n_simulations, n_jours, params_client, params_reverse, reverse_time, cost_option, cost_params)
@@ -74,15 +67,12 @@ def run_simulation(n_simulations, n_jours, params_client, params_reverse, cost_o
         #plot_return_probs(return_probs, params_reverse)
         #plot_shipping_demands(shipping_demands, params_client)
 
-        st.write("Coûts totaux des simulations:")
-        st.write(costs)
-        fig, ax = plt.subplots()
-        ax.hist(costs, bins=20)
-        ax.set_xlabel('Coût total')
-        ax.set_ylabel('Fréquence')
-        ax.set_title('Distribution des coûts totaux')
-        plt.tight_layout()
-        st.pyplot(fig)
+        rever = int(reverse_time)
+        y = np.array([costs.get(str(seuil_x))])
+        y = specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags(
+            y, cost_params, 50, params_reverse, params_client, n_jours, cost_option
+        )
+        plot_cost_vs_reverse(range(rever, rever+1), y)
     else:
         results, resultats_3_simulations, demand_scenarios, returns_scenarios, return_probs, shipping_demands, costs = simulate_(
             n_simulations, n_jours, params_client, params_reverse, reverse_time, cost_option, cost_params)
@@ -101,11 +91,10 @@ def main():
     seuil_confiance = st.number_input("Seuil de confiance (en %)", min_value=0.0, max_value=100.0, value=95.0) / 100.0
     
     if excel_based:
-        cost_params["reverse_time"] = st.number_input("Délai du retour des camions (reverse)", value=1.0)
+        #cost_params["reverse_time"] = st.number_input("Délai du retour des camions (reverse)", value=1.0)
         params_client, params_reverse = load_excel_data()
     else:
         params_client, params_reverse = get_manual_inputs()
-    
     cost_option, cost_params = get_cost_options()
     
     if st.button("Lancer la simulation") and params_client and params_reverse:
