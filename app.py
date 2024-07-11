@@ -1,7 +1,6 @@
 import streamlit as st
 import numpy as np
-import matplotlib.pyplot as plt
-from utils import simulate_, plot_cdf, plot_3_scenarios, plot_return_probs, plot_shipping_demands, specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags, plot_cost_vs_reverse, create_summary_table
+from utils import simulate_, plot_cdf, plot_3_scenarios, plot_return_probs, plot_shipping_demands, specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags, plot_cost_vs_reverse, create_summary_table, plot_reverse_optimal_fleet
 
 def load_excel_data():
     from excel_based_solution import load_data
@@ -29,9 +28,8 @@ def get_cost_options():
             cost_params["reverse_time"] = st.slider("Délai du retour des camions (reverse)", min_value=1, max_value=20, value=(1,1), step=1, label_visibility="visible")
             cost_params["nb_locations"] = st.number_input("Nombre de destinations", min_value=0.0, step=1., value=1.0)
             cost_params["cost_emballage"] = st.number_input("Coût d'achat des emballages", min_value=0.0, step=0.01, value=2.0)
-            cost_params["cost_location"] = st.number_input("Coût d'initialisation d'un point relai", min_value=0.0, step=0.1, value=5.0)
+            cost_params["cost_location"] = st.number_input("Coût de récupération à un point relai", min_value=0.0, step=0.1, value=5.0)
             cost_params["cost_per_demand"] = st.number_input("Coût par envoi", min_value=0.0, step=0.1, value=1.0)
-            #cost_params["cost_per_return"] = st.number_input("Coût par retour", min_value=0.0, step=0.1, value=0.5)
         elif cost_option == "Option 2":
             cost_params["reverse_time"] = st.number_input("Délai du retour des camions (reverse)", value=1.0)
             cost_params["cost_emballage"] = st.number_input("Coût d'achat des emballages", min_value=0.0, step=0.01, value=2.0)
@@ -50,7 +48,7 @@ def run_simulation(n_simulations, n_jours, params_client, params_reverse, cost_o
             results, resultats_3_simulations, demand_scenarios, returns_scenarios, return_probs, shipping_demands, costs = simulate_(
                 n_simulations, n_jours, params_client, params_reverse, i, cost_option, cost_params)
             
-            st.write(f"reverse définie à {i} jours")
+            st.markdown(f"## Reverse définie à {i} jours")
             seuil_x = plot_cdf(results, seuil_confiance)
             seuil_x_values.append(seuil_x)
             y.append(costs.get(str(seuil_x)))
@@ -60,6 +58,7 @@ def run_simulation(n_simulations, n_jours, params_client, params_reverse, cost_o
         ))
 
         plot_cost_vs_reverse(reverse_range, y)
+        plot_reverse_optimal_fleet(reverse_range, seuil_x_values)
         create_summary_table(reverse_range, y, seuil_x_values)
 
     elif cost_option=="Option 2":
@@ -95,7 +94,6 @@ def main():
     seuil_confiance = st.number_input("Seuil de confiance (en %)", min_value=0.0, max_value=100.0, value=95.0) / 100.0
     
     if excel_based:
-        #cost_params["reverse_time"] = st.number_input("Délai du retour des camions (reverse)", value=1.0)
         params_client, params_reverse = load_excel_data()
     else:
         params_client, params_reverse = get_manual_inputs()

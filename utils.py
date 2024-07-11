@@ -3,6 +3,7 @@ import numpy as np
 from scipy.stats import norm
 import plotly.graph_objects as go
 import pandas as pd
+import plotly.express as px
 
 def f_option_1(params, returns, demand):
     cost_dem = params["cost_per_demand"]
@@ -128,7 +129,6 @@ def plot_cdf(results, seuil_confiance=0.95):
 
 def plot_3_scenarios(dic_scenes, demand_scenarios, returns_scenarios):
     scenarios = ['minimum', 'medium', 'maximum']
-    titles = ['Scénario à faible demande', 'Scénario à moyenne demande', 'Scénario à forte demande']
     
     fig = go.Figure()
     
@@ -239,6 +239,30 @@ def plot_cost_vs_reverse(reverse_range, costs):
             yaxis_title='Coût'
         )
         st.plotly_chart(fig)
+
+def plot_reverse_optimal_fleet(reverse_r, values):
+    # Assurez-vous que reverse_r et values sont de longueur égale
+    if len(reverse_r) != len(values):
+        raise ValueError("reverse_r et values doivent avoir la même longueur.")
+    
+    # Créer un DataFrame à partir des données
+    df = pd.DataFrame({
+        'reverse_r': reverse_r,
+        'optimal_fleet': values
+    })
+    
+    # Créer un bar chart avec Plotly
+    fig = px.bar(df, x='reverse_r', y='optimal_fleet')
+    
+    # Mettre à jour la mise en page du graphique
+    fig.update_layout(
+        title='Évolution du stock optimal pour les différents délais de retour',
+        xaxis_title='Délai de retour (jours)',
+        yaxis_title='Flotte optimale'
+    )
+    
+    # Afficher le graphique avec Streamlit
+    st.plotly_chart(fig)
 
 def create_summary_table(reverse_range, y, seuil_x):
     # Créer un DataFrame vide

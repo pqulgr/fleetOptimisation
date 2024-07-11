@@ -35,34 +35,36 @@ def load_and_analyze_data(uploaded_file):
 def load_data(uploaded_file):
     if uploaded_file is not None:
         result = load_and_analyze_data(uploaded_file)
-        
+            
         if result is not None:
             df, export_mean, export_std, retour_mean, retour_std, p_value_export, p_value_retour = result
             
-            st.write("Aperçu du fichier chargé :")
+            st.markdown("### Aperçu du fichier chargé :")
             st.dataframe(df.head())
             
-            st.write("Statistiques :")
-            st.write(f"Moyenne des exports : {export_mean:.2f}")
-            st.write(f"Écart-type des exports : {export_std:.2f}")
-            st.write(f"Moyenne des retours : {retour_mean:.2f}")
-            st.write(f"Écart-type des retours : {retour_std:.2f}")
+            st.markdown("### Statistiques :")
+            st.markdown(f"- **Moyenne des exports :** {export_mean:.2f}")
+            st.markdown(f"- **Écart-type des exports :** {export_std:.2f}")
+            st.markdown(f"- **Moyenne des retours :** {retour_mean:.2f}")
+            st.markdown(f"- **Écart-type des retours :** {retour_std:.2f}")
             
-            st.write("Test de normalité (Shapiro-Wilk) :")
-            st.write(f"p-value pour les exports : {p_value_export:.4f}")
-            st.write(f"p-value pour les retours : {p_value_retour:.4f}")
+            st.markdown("### Test de normalité (Shapiro-Wilk) :")
+            st.markdown(f"- **p-value pour les exports :** {p_value_export:.4f}")
+            st.markdown(f"- **p-value pour les retours :** {p_value_retour:.4f}")
             
             alpha = 0.05
-            st.write(f"Les données suivent une loi normale si la p-value est supérieure à {alpha}")
+            st.markdown(f"Les données suivent une loi normale si la p-value est supérieure à {alpha}")
             
             if p_value_export > alpha:
-                st.write("Les données d'export suivent approximativement une loi normale.")
+                st.markdown("- **Les données d'export suivent approximativement une loi normale.**")
             else:
-                st.write("Les données d'export ne suivent pas une loi normale.")
+                st.markdown("- **Les données d'export ne suivent pas une loi normale.**")
             
             if p_value_retour > alpha:
-                st.write("Les données de retour suivent approximativement une loi normale.")
+                st.markdown("- **Les données de retour suivent approximativement une loi normale.**")
             else:
-                st.write("Les données de retour ne suivent pas une loi normale.")
+                st.markdown("- **Les données de retour ne suivent pas une loi normale.**")
+
+            # Retourner les statistiques si nécessaire
             return export_mean, export_std, retour_mean, retour_std
     return None, None, None, None

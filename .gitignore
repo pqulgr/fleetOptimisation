@@ -1,0 +1,20 @@
+# Ignorer les fichiers compilés
+*.pyc
+__pycache__
+
+# Ignorer les répertoires de configuration de l'éditeur
+.vscode/
+.idea/
+
+# Ignorer les répertoires de virtualenv
+venv/
+env/
+
+# Ignorer les fichiers de configuration personnels
+*.env
+
+# Ignorer les fichiers de logs
+*.log
+
+# Ignorer les fichiers de données
+data/
