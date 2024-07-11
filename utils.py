@@ -2,6 +2,7 @@ import streamlit as st
 import numpy as np
 from scipy.stats import norm
 import plotly.graph_objects as go
+import pandas as pd
 
 def f_option_1(params, returns, demand):
     cost_dem = params["cost_per_demand"]
@@ -238,6 +239,42 @@ def plot_cost_vs_reverse(reverse_range, costs):
             yaxis_title='Coût'
         )
         st.plotly_chart(fig)
+
+def create_summary_table(reverse_range, y, seuil_x):
+    # Créer un DataFrame vide
+    df = pd.DataFrame(index=reverse_range, columns=seuil_x)
+    
+    # Remplir le DataFrame avec les coûts moyens
+    for i, reverse in enumerate(reverse_range):
+        for j, nb_emballages in enumerate(seuil_x):
+            df.loc[reverse, nb_emballages] = y[i][j].mean()
+    
+    # Formater les valeurs pour l'affichage
+    df = df.map(lambda x: f"{x:.2f}")
+    
+    # Afficher le tableau avec Streamlit
+    st.markdown("## Tableau récapitulatif des coûts moyens:")
+    st.markdown("**Lignes:** Délai de retour (jours)")
+    st.markdown("**Colonnes:** Nombre d'emballages recommandé")
+    st.dataframe(df.style.highlight_min(axis=None, color='lightgreen'))
+    
+    # Trouver la combinaison optimale
+    min_cost = float('inf')
+    optimal_reverse = None
+    optimal_emballages = None
+    
+    for reverse in reverse_range:
+        for nb_emballages in seuil_x:
+            cost = float(df.loc[reverse, nb_emballages])
+            if cost < min_cost:
+                min_cost = cost
+                optimal_reverse = reverse
+                optimal_emballages = nb_emballages
+    
+    st.markdown("## Combinaison optimale:")
+    st.markdown(f"**Délai de retour:** {optimal_reverse} jours")
+    st.markdown(f"**Nombre d'emballages:** {optimal_emballages}")
+    st.markdown(f"**Coût moyen minimal:** {min_cost:.2f}")
 
 def specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags(y, cost_params, n_sim, params_reverse, params_client, n_days_sim, cost_option):
     y_ = [[] for _ in range(len(y))]

@@ -1,7 +1,7 @@
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
-from utils import simulate_, plot_cdf, plot_3_scenarios, plot_return_probs, plot_shipping_demands, specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags, plot_cost_vs_reverse
+from utils import simulate_, plot_cdf, plot_3_scenarios, plot_return_probs, plot_shipping_demands, specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags, plot_cost_vs_reverse, create_summary_table
 
 def load_excel_data():
     from excel_based_solution import load_data
@@ -43,29 +43,31 @@ def get_cost_options():
 
 def run_simulation(n_simulations, n_jours, params_client, params_reverse, cost_option, cost_params, seuil_confiance, reverse_time):
     if cost_option=="Option 1":
-        y=[]
-        for i in range(reverse_time[0],reverse_time[1]+1):
+        y = []
+        seuil_x_values = []
+        reverse_range = range(reverse_time[0], reverse_time[1]+1)
+        for i in reverse_range:
             results, resultats_3_simulations, demand_scenarios, returns_scenarios, return_probs, shipping_demands, costs = simulate_(
                 n_simulations, n_jours, params_client, params_reverse, i, cost_option, cost_params)
             
             st.write(f"reverse définie à {i} jours")
             seuil_x = plot_cdf(results, seuil_confiance)
-            #plot_3_scenarios(resultats_3_simulations, demand_scenarios, returns_scenarios)
+            seuil_x_values.append(seuil_x)
             y.append(costs.get(str(seuil_x)))
         
         y = np.array(specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags(
             y, cost_params, 50, params_reverse, params_client, n_jours, cost_option
         ))
 
-        plot_cost_vs_reverse(range(reverse_time[0], reverse_time[1]+1), y)
+        plot_cost_vs_reverse(reverse_range, y)
+        create_summary_table(reverse_range, y, seuil_x_values)
+
     elif cost_option=="Option 2":
         results, resultats_3_simulations, demand_scenarios, returns_scenarios, return_probs, shipping_demands, costs = simulate_(
             n_simulations, n_jours, params_client, params_reverse, reverse_time, cost_option, cost_params)
         
         seuil_x = plot_cdf(results, seuil_confiance)
         plot_3_scenarios(resultats_3_simulations, demand_scenarios, returns_scenarios)
-        #plot_return_probs(return_probs, params_reverse)
-        #plot_shipping_demands(shipping_demands, params_client)
 
         rever = int(reverse_time)
         y = np.array([costs.get(str(seuil_x))])
@@ -73,6 +75,8 @@ def run_simulation(n_simulations, n_jours, params_client, params_reverse, cost_o
             y, cost_params, 50, params_reverse, params_client, n_jours, cost_option
         )
         plot_cost_vs_reverse(range(rever, rever+1), y)
+        #create_summary_table([rever], y, [seuil_x])
+
     else:
         results, resultats_3_simulations, demand_scenarios, returns_scenarios, return_probs, shipping_demands, costs = simulate_(
             n_simulations, n_jours, params_client, params_reverse, reverse_time, cost_option, cost_params)
