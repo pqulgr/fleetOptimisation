@@ -25,7 +25,7 @@ def get_cost_options():
     if cost_options:
         cost_option = st.selectbox("Sélectionnez une option de coût", ("Option 1", "Option 2"))
         if cost_option == "Option 1":
-            cost_params["reverse_time"] = st.slider("Délai avant reverse. Nombre de jours avant que tout les emballages dosponibles soient récupérés", min_value=1, max_value=20, value=(1,1), step=1, label_visibility="visible")
+            cost_params["reverse_time"] = st.slider("Délai avant reverse. Nombre de jours avant que tout les emballages disponibles soient récupérés", min_value=1, max_value=20, value=(1,1), step=1, label_visibility="visible")
             cost_params["nb_locations"] = st.number_input("Nombre de destinations", min_value=0.0, step=1., value=1.0)
             cost_params["cost_emballage"] = st.number_input("Coût d'achat des emballages", min_value=0.0, step=0.01, value=2.0)
             cost_params["cost_location"] = st.number_input("Coût de récupération à un point relai", min_value=0.0, step=0.1, value=5.0)
