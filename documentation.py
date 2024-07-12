@@ -8,7 +8,7 @@ def show_documentation():
     Cette application simule la gestion d'un stock d'emballages réutilisables dans un système de chaîne d'approvisionnement en boucle fermée. Elle aide à déterminer le nombre optimal d'emballages nécessaires pour un entrepôt qui expédie des commandes à plusieurs magasins.
 
     ## Contexte du problème
-    Un entrepôt reçoit des demandes quotidiennes de commandes à expédier vers différents magasins. Une fois les commandes livrées et les produits déballés, les emballages vides sont collectés périodiquement par un camion et renvoyés à l'entrepôt. L'objectif est de déterminer la quantité optimale d'emballages réutilisables à maintenir en stock pour répondre à la demande tout en minimisant les coûts.
+    Un entrepôt reçoit des demandes quotidiennes de commandes à expédier vers différents magasins. Une fois les commandes livrées et les produits déballés, les emballages vides sont collectés périodiquement par un camion et renvoyés à l'entrepôt. L'objectif est de déterminer la quantité optimale d'emballages réutilisables à fournir en stock à l'entrepôt pour répondre à la demande tout en minimisant les coûts.
 
     ## Paramètres principaux
 
@@ -35,9 +35,9 @@ def show_documentation():
     ## Options de coût
 
     ### Option 1 (Coût basé sur les points de collecte)
-    - **Délai avant reverse** : Fréquence de collecte des emballages (en jours). 1 signifie que le camion ramène tout les jours les emballages disponibles dans tout les magasins
-    - **Nombre de destinations** : Nombre de points de livraison différents. Avec cette option, lors d'une ramasse, tout les lieux vont facturer leurs coût de service afn que le camion récupère l'emballage.
-    - **Coût de récupération à un point relai** : Coût associé à la collecte d'un emballage.
+    - **Délai avant reverse** : Fréquence de collecte des emballages (en jours). 1 signifie que le camion ramène tout les jours les emballages disponibles de tout les magasins dans l'entrepôt.
+    - **Nombre de destinations** : Nombre de points de livraison différents. Avec cette option, lors d'une ramasse, tout les lieux vont facturer leurs coût de service afn que le camion récupère les emballages disponible.
+    - **Coût de récupération à un point relai** : Coût associé à la collecte des emballages en un magasin.
     - **Coût d'achat des emballages** : Prix unitaire d'un emballage.
     - **Coût par envoi** : Coût fixe pour chaque expédition par emballage.
 
