@@ -1,6 +1,7 @@
 import streamlit as st
 import numpy as np
 from utils import simulate_, plot_cdf, plot_3_scenarios, plot_return_probs, plot_shipping_demands, specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags, plot_cost_vs_reverse, create_summary_table, plot_reverse_optimal_fleet
+from documentation import show_documentation
 
 def load_excel_data():
     from excel_based_solution import load_data
@@ -12,9 +13,9 @@ def load_excel_data():
     return None, None
 
 def get_manual_inputs():
-    mu_client = st.number_input("Moyenne du nombre d'expédition par jour (entrepôt)", value=2.0)
-    sigma_client = st.number_input("Ecart-type du nombre d'expédition par jour (entrepôt)", value=1.0)
-    mu_reverse = st.number_input("Moyenne du délai de restitution (disponibilité de l'emballage)", value=10.0)
+    mu_client = st.number_input("Moyenne du nombre d'expédition par jour (entrepôt)", value=1000.0)
+    sigma_client = st.number_input("Ecart-type du nombre d'expédition par jour (entrepôt)", value=100.0)
+    mu_reverse = st.number_input("Moyenne du délai de restitution (disponibilité de l'emballage)", value=4.0)
     sigma_reverse = st.number_input("Ecart-type du délai de restitution (disponibilité de l'emballage)", value=1.0)
     return (mu_client, sigma_client), (mu_reverse, sigma_reverse)
 
@@ -23,15 +24,16 @@ def get_cost_options():
     cost_params = {}
     cost_option = None
     if cost_options:
-        cost_option = st.selectbox("Sélectionnez une option de coût", ("Option 1", "Option 2"))
+        cost_option = st.selectbox("Sélectionnez une option de coût", ("Coût basé sur les points de collecte", "Coût basé sur le poids"))
+        cost_option = "Option 1" if cost_option=="Coût basé sur les points de collecte" else "Option 2"
         if cost_option == "Option 1":
-            cost_params["reverse_time"] = st.slider("Délai avant reverse. Nombre de jours avant que tout les emballages disponibles soient récupérés", min_value=1, max_value=20, value=(1,1), step=1, label_visibility="visible")
+            cost_params["reverse_time"] = st.slider("Délai avant reverse. Nombre de jours avant que tout les emballages disponibles soient récupérés", min_value=1, max_value=20, value=(1,3), step=1, label_visibility="visible")
             cost_params["nb_locations"] = st.number_input("Nombre de destinations", min_value=0.0, step=1., value=1.0)
             cost_params["cost_emballage"] = st.number_input("Coût d'achat des emballages", min_value=0.0, step=0.01, value=2.0)
             cost_params["cost_location"] = st.number_input("Coût de récupération à un point relai", min_value=0.0, step=0.1, value=5.0)
             cost_params["cost_per_demand"] = st.number_input("Coût par envoi", min_value=0.0, step=0.1, value=1.0)
         elif cost_option == "Option 2":
-            cost_params["reverse_time"] = st.number_input("Délai avant reverse. Nombre de jours avant que tout les emballages dosponibles soient récupérés", value=1.0)
+            cost_params["reverse_time"] = st.number_input("Délai avant reverse. Nombre de jours avant que tout les emballages disponibles soient récupérés", value=1.0)
             cost_params["cost_emballage"] = st.number_input("Coût d'achat des emballages", min_value=0.0, step=0.01, value=2.0)
             cost_params["poids_sac"] = st.number_input("Poids moyen", min_value=0.0, step=0.1, value=1.0)
             cost_params["cost_per_demand"] = st.number_input("Coût par envoi par Kg", min_value=0.0, step=0.1, value=1.0)
@@ -86,25 +88,31 @@ def run_simulation(n_simulations, n_jours, params_client, params_reverse, cost_o
         plot_shipping_demands(shipping_demands, params_client)
 
 def main():
-    st.title("Simulation de Stock")
     
-    excel_based = st.checkbox("Utiliser un fichier Excel")
-    n_jours = st.number_input("Nombre de jours pour la simulation", min_value=1, step=1, value=30)
-    n_simulations = st.number_input("Nombre de simulations", min_value=1, step=1, value=400)
-    seuil_confiance = st.number_input("Seuil de confiance (en %)", min_value=0.0, max_value=100.0, value=95.0) / 100.0
+    menu = ["Simulation", "Documentation"]
+    choice = st.sidebar.selectbox("Menu", menu)
     
-    if excel_based:
-        params_client, params_reverse = load_excel_data()
-    else:
-        params_client, params_reverse = get_manual_inputs()
-    cost_option, cost_params = get_cost_options()
-    
-    if st.button("Lancer la simulation") and params_client and params_reverse:
-        if cost_params.get("reverse_time"):
-            reverse_time = cost_params["reverse_time"]
+    if choice=="Simulation":
+        st.title("Simulation de Stock")
+        excel_based = st.checkbox("Utiliser un fichier Excel")
+        n_jours = st.number_input("Nombre de jours pour la simulation", min_value=1, step=1, value=30)
+        n_simulations = st.number_input("Nombre de simulations", min_value=1, step=1, value=400)
+        seuil_confiance = st.number_input("Seuil de confiance (en %)", min_value=0.0, max_value=100.0, value=95.0) / 100.0
+        
+        if excel_based:
+            params_client, params_reverse = load_excel_data()
         else:
-            reverse_time = 1
-        run_simulation(n_simulations, n_jours, params_client, params_reverse, cost_option, cost_params, seuil_confiance, reverse_time)
+            params_client, params_reverse = get_manual_inputs()
+        cost_option, cost_params = get_cost_options()
+        
+        if st.button("Lancer la simulation") and params_client and params_reverse:
+            if cost_params.get("reverse_time"):
+                reverse_time = cost_params["reverse_time"]
+            else:
+                reverse_time = 1
+            run_simulation(n_simulations, n_jours, params_client, params_reverse, cost_option, cost_params, seuil_confiance, reverse_time)
+    if choice == "Documentation":
+        show_documentation()
 
 if __name__ == "__main__":
     main()
