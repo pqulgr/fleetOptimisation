@@ -18,7 +18,7 @@ def show_documentation():
 
     ### Seuil de confiance
     - **Description** : Niveau de confiance pour déterminer le stock optimal.
-    - **Pourquoi c'est important** : Un seuil plus élevé réduit le risque de pénurie mais augmente la flotte nécessaire'.
+    - **Pourquoi c'est important** : Un seuil plus élevé réduit le risque de pénurie mais augmente la flotte nécessaire.
 
     ## Paramètres de distribution
 

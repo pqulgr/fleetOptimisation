@@ -265,40 +265,36 @@ def plot_reverse_optimal_fleet(reverse_r, values):
     st.plotly_chart(fig)
 
 def create_summary_table(reverse_range, y, seuil_x):
-    # Créer un DataFrame vide
-    df = pd.DataFrame(index=reverse_range, columns=seuil_x)
+    data = []
     
-    # Remplir le DataFrame avec les coûts moyens
+    # Remplir la liste avec les coûts moyens pertinents
     for i, reverse in enumerate(reverse_range):
-        for j, nb_emballages in enumerate(seuil_x):
-            df.loc[reverse, nb_emballages] = y[i][j].mean()
+        nb_emballages = seuil_x[i]  # Le nombre d'emballages recommandé pour ce délai de retour
+        cost = y[i].mean()  # Le coût moyen pour ce délai de retour
+        data.append({
+            'Délai de retour': reverse,
+            'Nombre d\'emballages': nb_emballages,
+            'Coût moyen': cost
+        })
+
+    df = pd.DataFrame(data)
+
+    df['Coût moyen'] = df['Coût moyen'].map(lambda x: f"{x:.2f}")
+
+    df = df.reset_index(drop=True)
     
-    # Formater les valeurs pour l'affichage
-    df = df.map(lambda x: f"{x:.2f}")
-    
-    # Afficher le tableau avec Streamlit
     st.markdown("## Tableau récapitulatif des coûts moyens:")
-    st.markdown("**Lignes:** Délai de retour (jours)")
-    st.markdown("**Colonnes:** Nombre d'emballages recommandé")
-    st.dataframe(df.style.highlight_min(axis=None, color='lightgreen'))
-    
-    # Trouver la combinaison optimale
-    min_cost = float('inf')
-    optimal_reverse = None
-    optimal_emballages = None
-    
-    for reverse in reverse_range:
-        for nb_emballages in seuil_x:
-            cost = float(df.loc[reverse, nb_emballages])
-            if cost < min_cost:
-                min_cost = cost
-                optimal_reverse = reverse
-                optimal_emballages = nb_emballages
+    st.dataframe(df.style.highlight_min(subset=['Coût moyen'], color='lightgreen'))
+
+    min_cost_row = df.loc[df['Coût moyen'].astype(float).idxmin()]
+    optimal_reverse = min_cost_row['Délai de retour']
+    optimal_emballages = min_cost_row['Nombre d\'emballages']
+    min_cost = min_cost_row['Coût moyen']
     
     st.markdown("## Combinaison optimale:")
     st.markdown(f"**Délai de retour:** {optimal_reverse} jours")
     st.markdown(f"**Nombre d'emballages:** {optimal_emballages}")
-    st.markdown(f"**Coût moyen minimal:** {min_cost:.2f}")
+    st.markdown(f"**Coût moyen minimal:** {min_cost}€")
 
 def specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags(y, cost_params, n_sim, params_reverse, params_client, n_days_sim, cost_option):
     y_ = [[] for _ in range(len(y))]

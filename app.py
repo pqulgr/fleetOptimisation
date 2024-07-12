@@ -72,11 +72,11 @@ def run_simulation(n_simulations, n_jours, params_client, params_reverse, cost_o
 
         rever = int(reverse_time)
         y = np.array([costs.get(str(seuil_x))])
-        y = specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags(
+        y = np.array(specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags(
             y, cost_params, 50, params_reverse, params_client, n_jours, cost_option
-        )
+        ))
         plot_cost_vs_reverse(range(rever, rever+1), y)
-        #create_summary_table([rever], y, [seuil_x])
+        create_summary_table([rever], y, [seuil_x])
 
     else:
         results, resultats_3_simulations, demand_scenarios, returns_scenarios, return_probs, shipping_demands, costs = simulate_(
