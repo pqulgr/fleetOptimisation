@@ -63,7 +63,7 @@ def show_documentation():
     ## Interprétation des résultats
     Les résultats vous aideront à déterminer :
     1. Le nombre optimal d'emballages à maintenir en stock.
-    2. L'impact des différents paramètres sur les coûts et la disponibilité des emballages.
+    2. Option 1 : le nombre de reverse à parametrer pour minimiser le coût.
 
     Utilisez ces informations pour prendre des décisions éclairées sur la gestion de votre stock d'emballages réutilisables.
     """)
