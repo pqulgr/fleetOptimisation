@@ -288,7 +288,7 @@ def create_summary_table(reverse_range, y, seuil_x):
 
     min_cost_row = df.loc[df['Coût moyen'].astype(float).idxmin()]
     optimal_reverse = min_cost_row['Délai de retour']
-    optimal_emballages = min_cost_row['Nombre d\'emballages']
+    optimal_emballages = int(min_cost_row['Nombre d\'emballages'])
     min_cost = min_cost_row['Coût moyen']
     
     st.markdown("## Combinaison optimale:")
@@ -298,7 +298,9 @@ def create_summary_table(reverse_range, y, seuil_x):
 
 def specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags(y, cost_params, n_sim, params_reverse, params_client, n_days_sim, cost_option):
     y_ = [[] for _ in range(len(y))]
-
+    y_ = [[item[1]] for item in y]
+    return y_
+    """
     length_return = int(max(n_days_sim, params_reverse[0]+1+5*params_reverse[1]))
     prob = np.array([norm.cdf(k + 0.5, params_reverse[0], params_reverse[1]) - norm.cdf(k - 0.5, params_reverse[0], params_reverse[1]) for k in range(1, length_return)])
     return_probs = prob / sum(prob)
@@ -309,19 +311,20 @@ def specific_fonction_for_accurately_determine_the_cost_of_the_recommended_numbe
     progress_bar = st.empty()
     for i,item in enumerate(y):
         progress_bar.progress((i + 1) / len(y))
-        cost_params["nb_emballages"] = item
+        print(item)
+        cost_params["nb_emballages"] = item[0]
             
         for j in range(n_sim):
 
             pending_returns = np.zeros(n_days_sim)
-            available_returns = np.zeros(n_days_sim)  # New array to track available returns
+            available_returns = np.zeros(n_days_sim)
             demand = np.random.choice(np.arange(length_shipping), size=n_days_sim, p=shipping_demands)
             
             for day in range(n_days_sim):
                 day_reverse_choices = np.random.choice(np.arange(1, length_return), size=demand[day], p=return_probs)
                 future_days = day + day_reverse_choices
                 future_days = future_days[future_days < n_days_sim]
-                np.add.at(available_returns, future_days, 1)  # Add to available returns instead of pending returns
+                np.add.at(available_returns, future_days, 1)
                 
                 # Check if it's a day for the truck to collect returns
                 if day % (j+1) == 0:
@@ -331,9 +334,10 @@ def specific_fonction_for_accurately_determine_the_cost_of_the_recommended_numbe
             
             returns = pending_returns.copy()
             if cost_option == "Option 1":
+                print(f"{item} : {f_option_1(cost_params, returns, demand)}")
                 y_[i].append(f_option_1(cost_params, returns, demand))
             elif cost_option == "Option 2":
                 y_[i].append(f_option_2(cost_params, returns, demand))
         
     progress_bar.empty()
-    return y_
+    return y_"""

@@ -53,10 +53,10 @@ def run_simulation(n_simulations, n_jours, params_client, params_reverse, cost_o
             st.markdown(f"## Reverse définie à {i} jours")
             seuil_x = plot_cdf(results, seuil_confiance)
             seuil_x_values.append(seuil_x)
-            y.append(costs.get(str(seuil_x)))
+            y.append((seuil_x,costs.get(str(seuil_x))))
         
         y = np.array(specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags(
-            y, cost_params, 50, params_reverse, params_client, n_jours, cost_option
+            y, cost_params, 400, params_reverse, params_client, n_jours, cost_option
         ))
 
         plot_cost_vs_reverse(reverse_range, y)
@@ -71,7 +71,7 @@ def run_simulation(n_simulations, n_jours, params_client, params_reverse, cost_o
         plot_3_scenarios(resultats_3_simulations, demand_scenarios, returns_scenarios)
 
         rever = int(reverse_time)
-        y = np.array([costs.get(str(seuil_x))])
+        y = np.array([(seuil_x,costs.get(str(seuil_x)))])
         y = np.array(specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags(
             y, cost_params, 50, params_reverse, params_client, n_jours, cost_option
         ))
