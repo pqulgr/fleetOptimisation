@@ -2,15 +2,7 @@ import streamlit as st
 import numpy as np
 from utils import simulate_, plot_cdf, plot_3_scenarios, plot_return_probs, plot_shipping_demands, specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags, plot_cost_vs_reverse, create_summary_table, plot_reverse_optimal_fleet
 from documentation import show_documentation
-
-def load_excel_data():
-    from excel_based_solution import load_data
-    st.title("Analyse de données d'expédition")
-    uploaded_file = st.file_uploader("Choisissez un fichier Excel ou CSV", type=["xlsx", "csv"])
-    if uploaded_file is not None:
-        mu_client, sigma_client, mu_reverse, sigma_reverse = load_data(uploaded_file)
-        return (mu_client, sigma_client), (mu_reverse, sigma_reverse)
-    return None, None
+from excel_based_solution import main_excel
 
 def get_manual_inputs():
     mu_client = st.number_input("Moyenne du nombre d'expédition par jour (entrepôt)", value=1000.0)
@@ -90,27 +82,28 @@ def run_simulation(n_simulations, n_jours, params_client, params_reverse, cost_o
 def main():
     
     menu = ["Simulation", "Documentation"]
+    st.set_page_config(layout="wide")
     choice = st.sidebar.selectbox("Menu", menu)
     
     if choice=="Simulation":
         st.title("Simulation de Stock")
-        excel_based = st.checkbox("Utiliser un fichier Excel")
-        n_jours = st.number_input("Nombre de jours pour la simulation", min_value=1, step=1, value=30)
-        n_simulations = st.number_input("Nombre de simulations", min_value=1, step=1, value=400)
-        seuil_confiance = st.number_input("Seuil de confiance (en %)", min_value=0.0, max_value=100.0, value=95.0) / 100.0
-        
-        if excel_based:
-            params_client, params_reverse = load_excel_data()
+        excel_based = st.selectbox("Choix du traitement", ("Traitement par IA a base du fichier Excel", "Traitement par loi normale"))
+        if excel_based=="Traitement par IA a base du fichier Excel":
+            main_excel()
         else:
+            n_jours = st.number_input("Nombre de jours pour la simulation", min_value=1, step=1, value=30)
+            n_simulations = st.number_input("Nombre de simulations", min_value=1, step=1, value=400)
+            seuil_confiance = st.number_input("Seuil de confiance (en %)", min_value=0.0, max_value=100.0, value=95.0) / 100.0
+            
             params_client, params_reverse = get_manual_inputs()
-        cost_option, cost_params = get_cost_options()
-        
-        if st.button("Lancer la simulation") and params_client and params_reverse:
-            if cost_params.get("reverse_time"):
-                reverse_time = cost_params["reverse_time"]
-            else:
-                reverse_time = 1
-            run_simulation(n_simulations, n_jours, params_client, params_reverse, cost_option, cost_params, seuil_confiance, reverse_time)
+            cost_option, cost_params = get_cost_options()
+            
+            if st.button("Lancer la simulation") and params_client and params_reverse:
+                if cost_params.get("reverse_time"):
+                    reverse_time = cost_params["reverse_time"]
+                else:
+                    reverse_time = 1
+                run_simulation(n_simulations, n_jours, params_client, params_reverse, cost_option, cost_params, seuil_confiance, reverse_time)
     if choice == "Documentation":
         show_documentation()
 

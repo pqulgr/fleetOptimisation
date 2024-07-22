@@ -273,13 +273,13 @@ def create_summary_table(reverse_range, y, seuil_x):
         cost = y[i].mean()  # Le coût moyen pour ce délai de retour
         data.append({
             'Délai de retour': reverse,
-            'Nombre d\'emballages': nb_emballages,
-            'Coût moyen': cost
+            'Nombre d\'emballages': int(nb_emballages),
+            'Coût moyen': int(cost)
         })
 
     df = pd.DataFrame(data)
 
-    df['Coût moyen'] = df['Coût moyen'].map(lambda x: f"{x:.2f}")
+    df['Coût moyen'] = df['Coût moyen'].map(lambda x: f"{x:.0f}")
 
     df = df.reset_index(drop=True)
     
