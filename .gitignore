@@ -18,3 +18,7 @@ env/
 
 # Ignorer les fichiers de données
 data/
+
+*.csv
+
+explore_rnn.ipynb
