@@ -5,7 +5,6 @@ from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Input
 from tensorflow.keras.optimizers import Adam
-import tensorflow as tf
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from tensorflow.keras.callbacks import Callback
@@ -122,7 +121,6 @@ def plot_predictions(df, train_predict, test_predict, future_predict, train_size
 
 # Application Streamlit
 def main_excel():
-    tf.config.run_functions_eagerly(True)
     if 'step' not in st.session_state:
         st.session_state.step = 0
     
