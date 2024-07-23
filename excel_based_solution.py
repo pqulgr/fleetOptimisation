@@ -51,7 +51,7 @@ def train_model(X_train, y_train, epochs):
         Input((X_train.shape[1], 1)),
         LSTM(50, activation='relu', return_sequences=True),
         LSTM(50, activation='relu'),
-        Dense(1)
+        Dense(1, activation='relu')
     ])
     model.compile(optimizer=Adam(learning_rate=0.001), loss='mse')
     
@@ -203,18 +203,27 @@ def main_excel():
         with st.spinner("Prédiction du modèle en cours..."):
             # Faire des prédictions
             train_predict = st.session_state.model.predict(st.session_state.X_train)
+            mean_X_train = st.session_state.X_train.mean() * 1e6
             test_predict = st.session_state.model.predict(st.session_state.X_test)
             train_predict = st.session_state.scaler.inverse_transform(train_predict)
             test_predict = st.session_state.scaler.inverse_transform(test_predict)
             
-            # Prédictions futures
+                        # Prédictions futures
             last_sequence = scaled_data[-seq_length:]
             future_predictions = []
-            for _ in range(nb_future_prediction):  # Prédire pour les nb_future_prediction prochains jours
+
+            for i in range(nb_future_prediction):
                 next_pred = st.session_state.model.predict(last_sequence.reshape(1, seq_length, 1))
+                
+                # Vérifier si la prédiction dépasse un certain seuil
+                if np.abs(next_pred[0, 0]) > mean_X_train:  # Ajustez le seuil selon vos besoins
+                    print(f"Arrêt des prédictions : valeur prédite trop grande à l'étape {i}")
+                    break
+                
                 future_predictions.append(next_pred[0, 0])
                 last_sequence = np.roll(last_sequence, -1)
                 last_sequence[-1] = next_pred
+
             future_predictions = st.session_state.scaler.inverse_transform(np.array(future_predictions).reshape(-1, 1))
         
         # Afficher les prédictions vs réalité
