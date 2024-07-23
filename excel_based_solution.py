@@ -87,7 +87,7 @@ def plot_input_data(df, date_column, colis_column):
     df = convert_dates(df, date_column)
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df[date_column], y=df[colis_column], mode='lines', name='Exportations réelles'))
-    fig.update_layout(title='Données d\'exportation',
+    fig.update_layout(title="Données d'exportation",
                       xaxis_title='Date',
                       yaxis_title='Exportations',
                       legend_title='Légende')
@@ -159,7 +159,8 @@ def main_excel():
     # Étape 2 : Entraînement du modèle
     if 'data_loaded' in st.session_state and st.session_state.data_loaded and uploaded_file:
         st.header("Entraînement du modèle")
-        epochs = st.slider("Nombre d'époques", min_value=10, max_value=1000, value=400, step=10)
+        epochs = st.slider("Nombre d'époques", min_value=10, max_value=1000, value=50, step=10)
+        nb_future_prediction = st.slider("Nombre de jours futur à prévoir", min_value=1, max_value=1000, value=30, step=1)
         
         if st.button("Entraîner le modèle"):
             with st.spinner("Entraînement du modèle en cours..."):
@@ -182,6 +183,8 @@ def main_excel():
                 st.session_state.model = model
                 st.session_state.history = history
                 st.session_state.scaler = scaler
+                st.session_state.X_train = X_train
+                st.session_state.y_train = y_train
                 st.session_state.X_test = X_test
                 st.session_state.y_test = y_test
                 st.session_state.train_size = train_size
@@ -197,21 +200,22 @@ def main_excel():
         st.subheader("Courbes d'apprentissage")
         st.plotly_chart(plot_learning_curves(st.session_state.history))
         
-        # Faire des prédictions
-        train_predict = st.session_state.model.predict(X_train)
-        test_predict = st.session_state.model.predict(st.session_state.X_test)
-        train_predict = st.session_state.scaler.inverse_transform(train_predict)
-        test_predict = st.session_state.scaler.inverse_transform(test_predict)
-        
-        # Prédictions futures
-        last_sequence = scaled_data[-seq_length:]
-        future_predictions = []
-        for _ in range(30):  # Prédire pour les 30 prochains jours
-            next_pred = st.session_state.model.predict(last_sequence.reshape(1, seq_length, 1))
-            future_predictions.append(next_pred[0, 0])
-            last_sequence = np.roll(last_sequence, -1)
-            last_sequence[-1] = next_pred
-        future_predictions = st.session_state.scaler.inverse_transform(np.array(future_predictions).reshape(-1, 1))
+        with st.spinner("Prédiction du modèle en cours..."):
+            # Faire des prédictions
+            train_predict = st.session_state.model.predict(st.session_state.X_train)
+            test_predict = st.session_state.model.predict(st.session_state.X_test)
+            train_predict = st.session_state.scaler.inverse_transform(train_predict)
+            test_predict = st.session_state.scaler.inverse_transform(test_predict)
+            
+            # Prédictions futures
+            last_sequence = scaled_data[-seq_length:]
+            future_predictions = []
+            for _ in range(nb_future_prediction):  # Prédire pour les nb_future_prediction prochains jours
+                next_pred = st.session_state.model.predict(last_sequence.reshape(1, seq_length, 1))
+                future_predictions.append(next_pred[0, 0])
+                last_sequence = np.roll(last_sequence, -1)
+                last_sequence[-1] = next_pred
+            future_predictions = st.session_state.scaler.inverse_transform(np.array(future_predictions).reshape(-1, 1))
         
         # Afficher les prédictions vs réalité
         st.subheader("Prédictions vs Réalité")
