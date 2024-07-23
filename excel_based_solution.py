@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense
+from tensorflow.keras.layers import LSTM, Dense, Input
 from tensorflow.keras.optimizers import Adam
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -48,7 +48,8 @@ class ProgressCallback(Callback):
 
 def train_model(X_train, y_train, epochs):
     model = Sequential([
-        LSTM(50, activation='relu', input_shape=(X_train.shape[1], 1), return_sequences=True),
+        Input((X_train.shape[1], 1)),
+        LSTM(50, activation='relu', return_sequences=True),
         LSTM(50, activation='relu'),
         Dense(1)
     ])
