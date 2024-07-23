@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Input
+from tensorflow.keras.layers import LSTM, Dense, Input, Dropout
 from tensorflow.keras.optimizers import Adam
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -28,12 +28,26 @@ def preprocess(uploaded_file, date_column, colis_column):
     
     return df
 
-# Fonction pour créer des séquences
-def create_sequences(data, seq_length):
+def cyclic_encoding(dates):
+    # Convert dates to day of the week (0 for Monday, 6 for Sunday)
+    days = dates.dt.dayofweek  # Utiliser dt.dayofweek pour les séries pandas
+    
+    # Encode cyclically
+    encoding = np.column_stack([
+        np.sin(2 * np.pi * days / 7),
+        np.cos(2 * np.pi * days / 7)
+    ])
+    
+    return encoding
+
+def create_sequences(data, dates, seq_length):
     X, y = [], []
+    cyclic_encoded = cyclic_encoding(dates)
+    
     for i in range(len(data) - seq_length):
-        X.append(data[i:(i + seq_length), 0])
-        y.append(data[i + seq_length, 0])
+        X.append(np.column_stack((data[i:(i + seq_length)], cyclic_encoded[i:(i + seq_length)])))
+        y.append(data[i + seq_length])
+    
     return np.array(X), np.array(y)
 
 class ProgressCallback(Callback):
@@ -46,17 +60,20 @@ class ProgressCallback(Callback):
         progress = (epoch + 1) / self.epochs
         self.progress_bar.progress(progress)
 
+
 def train_model(X_train, y_train, epochs):
     model = Sequential([
-        Input((X_train.shape[1], 1)),
-        LSTM(50, activation='relu', return_sequences=True),
-        LSTM(50, activation='relu'),
+        Input((X_train.shape[1], X_train.shape[2])),
+        LSTM(64, return_sequences=True),
+        Dropout(0.2),
+        LSTM(32),
+        Dropout(0.2),
+        Dense(16, activation='relu'),
         Dense(1, activation='relu')
     ])
     model.compile(optimizer=Adam(learning_rate=0.001), loss='mse')
-    
     progress_callback = ProgressCallback(epochs)
-    
+        
     history = model.fit(
         X_train, y_train, 
         epochs=epochs, 
@@ -67,11 +84,30 @@ def train_model(X_train, y_train, epochs):
     )
     return model, history
 
+def predict_future(model, last_sequence, last_date, num_steps, scaler):
+    future_predictions = []
 
-def convert_dates(df, date_column):
-    if df[date_column].dtype == 'object':
-        df[date_column] = pd.to_datetime(df[date_column])
-    return df
+    for _ in range(num_steps):
+        # Préparer l'entrée pour le modèle
+        last_sequence = np.expand_dims(last_sequence, axis=0)  # Ajouter la dimension du batch
+
+        # Prédire la prochaine valeur
+        next_value = model.predict(last_sequence)[0, 0]  # Extraire la prédiction
+
+        # Ajouter la prédiction à la liste des prédictions
+        future_predictions.append(next_value)
+
+        # Convertir last_date en série pandas pour utiliser cyclic_encoding
+        last_date_series = pd.Series([last_date])
+
+        # Mettre à jour la séquence initiale en supprimant le premier pas de temps
+        # et en ajoutant la nouvelle prédiction comme nouveau contexte
+        new_context = np.concatenate((np.array([[next_value]]), cyclic_encoding(last_date_series)), axis=1)
+        last_sequence = np.vstack((last_sequence[0, 1:], new_context))
+        last_date = last_date + pd.Timedelta(days=1)
+
+    future_predictions = scaler.inverse_transform(np.array(future_predictions).reshape(-1, 1))
+    return future_predictions
 
 def plot_learning_curves(history):
     fig = go.Figure()
@@ -84,7 +120,6 @@ def plot_learning_curves(history):
     return fig
 
 def plot_input_data(df, date_column, colis_column):
-    df = convert_dates(df, date_column)
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df[date_column], y=df[colis_column], mode='lines', name='Exportations réelles'))
     fig.update_layout(title="Données d'exportation",
@@ -94,7 +129,6 @@ def plot_input_data(df, date_column, colis_column):
     return fig
 
 def plot_predictions(df, train_predict, test_predict, future_predict, train_size, seq_length, date_column, colis_column):
-    df = convert_dates(df, date_column)
     fig = go.Figure()
 
     # Données réelles
@@ -167,18 +201,21 @@ def main_excel():
                 df = st.session_state.df
                 scaler = MinMaxScaler(feature_range=(0, 1))
                 scaled_data = scaler.fit_transform(df[colis_column].values.reshape(-1, 1))
-                
-                seq_length = 30
-                X, y = create_sequences(scaled_data, seq_length)
-                
+
+                seq_length = 30  # Utiliser 30 jours pour prédire le jour suivant
+                X, y = create_sequences(scaled_data, df[date_column], seq_length)
+
+                # Diviser en ensembles d'entraînement et de test
                 train_size = int(len(X) * 0.8)
                 X_train, X_test = X[:train_size], X[train_size:]
                 y_train, y_test = y[:train_size], y[train_size:]
-                
-                X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], 1))
-                X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 1))
+
+                # Reshape pour l'entrée LSTM [samples, time steps, features]
+                X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], X_train.shape[2]))
+                X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], X_train.shape[2]))
                 
                 model, history = train_model(X_train, y_train, epochs)
+                st.empty()
                 
                 st.session_state.model = model
                 st.session_state.history = history
@@ -203,28 +240,14 @@ def main_excel():
         with st.spinner("Prédiction du modèle en cours..."):
             # Faire des prédictions
             train_predict = st.session_state.model.predict(st.session_state.X_train)
-            mean_X_train = st.session_state.X_train.mean() * 1e6
             test_predict = st.session_state.model.predict(st.session_state.X_test)
             train_predict = st.session_state.scaler.inverse_transform(train_predict)
             test_predict = st.session_state.scaler.inverse_transform(test_predict)
-            
-                        # Prédictions futures
-            last_sequence = scaled_data[-seq_length:]
-            future_predictions = []
 
-            for i in range(nb_future_prediction):
-                next_pred = st.session_state.model.predict(last_sequence.reshape(1, seq_length, 1))
-                
-                # Vérifier si la prédiction dépasse un certain seuil
-                if np.abs(next_pred[0, 0]) > mean_X_train:  # Ajustez le seuil selon vos besoins
-                    print(f"Arrêt des prédictions : valeur prédite trop grande à l'étape {i}")
-                    break
-                
-                future_predictions.append(next_pred[0, 0])
-                last_sequence = np.roll(last_sequence, -1)
-                last_sequence[-1] = next_pred
-
-            future_predictions = st.session_state.scaler.inverse_transform(np.array(future_predictions).reshape(-1, 1))
+            # Prédire les 30 prochains jours
+            last_sequence = np.concatenate((scaled_data[-seq_length:], cyclic_encoding(df[date_column].iloc[-seq_length:])), axis=1)
+            last_date = st.session_state.df[date_column].iloc[-1]
+            future_predictions = predict_future(model, last_sequence, last_date, nb_future_prediction, scaler)
         
         # Afficher les prédictions vs réalité
         st.subheader("Prédictions vs Réalité")
