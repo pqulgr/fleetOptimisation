@@ -47,13 +47,12 @@ def run_simulation(n_simulations, n_jours, params_client, params_reverse, cost_o
             seuil_x_values.append(seuil_x)
             y.append((seuil_x,costs.get(str(seuil_x))))
         
-        y = np.array(specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags(
+        costs_per_reverse = specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags(
             y, cost_params, 400, params_reverse, params_client, n_jours, cost_option
-        ))
-
-        plot_cost_vs_reverse(reverse_range, y)
+        )
+        plot_cost_vs_reverse(costs_per_reverse)
         plot_reverse_optimal_fleet(reverse_range, seuil_x_values)
-        create_summary_table(reverse_range, y, seuil_x_values)
+        create_summary_table(reverse_range, costs_per_reverse, seuil_x_values)
 
     elif cost_option=="Option 2":
         results, resultats_3_simulations, demand_scenarios, returns_scenarios, return_probs, shipping_demands, costs = simulate_(
@@ -64,11 +63,12 @@ def run_simulation(n_simulations, n_jours, params_client, params_reverse, cost_o
 
         rever = int(reverse_time)
         y = np.array([(seuil_x,costs.get(str(seuil_x)))])
-        y = np.array(specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags(
-            y, cost_params, 50, params_reverse, params_client, n_jours, cost_option
-        ))
-        plot_cost_vs_reverse(range(rever, rever+1), y)
-        create_summary_table([rever], y, [seuil_x])
+        costs_per_reverse = specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags(
+            y, cost_params, 400, params_reverse, params_client, n_jours, cost_option
+        )
+
+        plot_cost_vs_reverse(costs_per_reverse)
+        create_summary_table([rever], costs_per_reverse, [seuil_x])
 
     else:
         results, resultats_3_simulations, demand_scenarios, returns_scenarios, return_probs, shipping_demands, costs = simulate_(

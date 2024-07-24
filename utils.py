@@ -218,27 +218,42 @@ def plot_shipping_demands(shipping_demands, params):
     else:
         st.write("Les paramètres de centrage de la courbe de demande sont incorrects. Veuillez vérifier les paramètres de la distribution.")
 
-def plot_cost_vs_reverse(reverse_range, costs):
-    reverse_range = list(reverse_range)  # Convertir range en liste
 
-    # Ajout d'un boxplot pour montrer la distribution des coûts
+def plot_cost_vs_reverse(costs_per_reverse):
     fig = go.Figure()
-    for i, reverse in enumerate(reverse_range):
-        fig.add_trace(go.Box(y=costs[i], name=str(reverse)))
-    if len(reverse_range)==1:
-        fig.update_layout(
-            title='Distribution du coût en fonction du délai de retour',
-            xaxis_title='Délai de retour (jours)',
-            yaxis_title='Coût'
-        )
-        st.plotly_chart(fig)
-    else:
-        fig.update_layout(
-            title='Distribution des coûts en fonction du délai de retour',
-            xaxis_title='Délai de retour (jours)',
-            yaxis_title='Coût'
-        )
-        st.plotly_chart(fig)
+
+    reverses = [cost['reverse']+1 for cost in costs_per_reverse]
+    mean_costs = [cost['mean_cost'] for cost in costs_per_reverse]
+    lower_bounds = [cost['lower_bound'] for cost in costs_per_reverse]
+    upper_bounds = [cost['upper_bound'] for cost in costs_per_reverse]
+
+    # Tracer la courbe moyenne
+    fig.add_trace(go.Scatter(
+        x=reverses,
+        y=mean_costs,
+        mode='lines+markers',
+        name='Coût moyen'
+    ))
+
+    # Ajouter la zone d'incertitude
+    fig.add_trace(go.Scatter(
+        x=reverses+reverses[::-1],
+        y=upper_bounds+lower_bounds[::-1],
+        fill='toself',
+        fillcolor='rgba(0,100,80,0.2)',
+        line=dict(color='rgba(255,255,255,0)'),
+        hoverinfo="skip",
+        showlegend=False
+    ))
+
+    fig.update_layout(
+        title='Coûts moyens et variance en fonction du délai de reverse',
+        xaxis_title='Délai de reverse (jours)',
+        yaxis_title='Coût',
+        hovermode="x"
+    )
+
+    st.plotly_chart(fig)
 
 def plot_reverse_optimal_fleet(reverse_r, values):
     # Assurez-vous que reverse_r et values sont de longueur égale
@@ -270,7 +285,7 @@ def create_summary_table(reverse_range, y, seuil_x):
     # Remplir la liste avec les coûts moyens pertinents
     for i, reverse in enumerate(reverse_range):
         nb_emballages = seuil_x[i]  # Le nombre d'emballages recommandé pour ce délai de retour
-        cost = y[i].mean()  # Le coût moyen pour ce délai de retour
+        cost = y[i]['mean_cost']# Le coût moyen pour ce délai de retour
         data.append({
             'Délai de retour': reverse,
             'Nombre d\'emballages': int(nb_emballages),
@@ -297,47 +312,38 @@ def create_summary_table(reverse_range, y, seuil_x):
     st.markdown(f"**Coût moyen minimal:** {min_cost}€")
 
 def specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags(y, cost_params, n_sim, params_reverse, params_client, n_days_sim, cost_option):
-    y_ = [[] for _ in range(len(y))]
-    y_ = [[item[1]] for item in y]
-    return y_
-    """
-    length_return = int(max(n_days_sim, params_reverse[0]+1+5*params_reverse[1]))
-    prob = np.array([norm.cdf(k + 0.5, params_reverse[0], params_reverse[1]) - norm.cdf(k - 0.5, params_reverse[0], params_reverse[1]) for k in range(1, length_return)])
-    return_probs = prob / sum(prob)
-
-    length_shipping = int(max(n_days_sim, params_client[0]+1+5*params_client[1]))
-    prob = np.array([norm.cdf(k + 0.5, params_client[0], params_client[1]) - norm.cdf(k - 0.5, params_client[0], params_client[1]) for k in range(length_shipping)])
-    shipping_demands = prob / sum(prob)
-    progress_bar = st.empty()
-    for i,item in enumerate(y):
-        progress_bar.progress((i + 1) / len(y))
-        print(item)
-        cost_params["nb_emballages"] = item[0]
-            
-        for j in range(n_sim):
-
-            pending_returns = np.zeros(n_days_sim)
-            available_returns = np.zeros(n_days_sim)
-            demand = np.random.choice(np.arange(length_shipping), size=n_days_sim, p=shipping_demands)
-            
-            for day in range(n_days_sim):
-                day_reverse_choices = np.random.choice(np.arange(1, length_return), size=demand[day], p=return_probs)
-                future_days = day + day_reverse_choices
-                future_days = future_days[future_days < n_days_sim]
-                np.add.at(available_returns, future_days, 1)
-                
-                # Check if it's a day for the truck to collect returns
-                if day % (j+1) == 0:
-                    # Add all available returns to pending returns
-                    pending_returns[day] += np.sum(available_returns[:day+1])
-                    available_returns[:day+1] = 0  # Reset available returns
-            
-            returns = pending_returns.copy()
-            if cost_option == "Option 1":
-                print(f"{item} : {f_option_1(cost_params, returns, demand)}")
-                y_[i].append(f_option_1(cost_params, returns, demand))
-            elif cost_option == "Option 2":
-                y_[i].append(f_option_2(cost_params, returns, demand))
+    costs_per_reverse = []
+    
+    for reverse, (recommended_bags, _) in enumerate(y):
+        costs_for_this_reverse = []
+        cost_params["reverse_time"] = reverse
+        cost_params["nb_emballages"] = recommended_bags
         
-    progress_bar.empty()
-    return y_"""
+        for _ in range(n_sim):
+            # Simuler la demande et les retours
+            demand = np.random.normal(params_client[0], params_client[1], n_days_sim)
+            returns = np.random.normal(params_reverse[0], params_reverse[1], n_days_sim)
+            
+            # Calculer le coût pour cette simulation
+            if cost_option == "Option 1":
+                cost = f_option_1(cost_params, returns, demand)
+            elif cost_option == "Option 2":
+                cost = f_option_2(cost_params, returns, demand)
+            else:
+                raise ValueError("Option de coût non reconnue")
+            
+            costs_for_this_reverse.append(cost)
+        
+        # Calculer la moyenne et l'écart-type des coûts pour ce reverse
+        mean_cost = np.mean(costs_for_this_reverse)
+        std_cost = np.std(costs_for_this_reverse)
+        
+        costs_per_reverse.append({
+            'reverse': reverse,
+            'recommended_bags': recommended_bags,
+            'mean_cost': mean_cost,
+            'lower_bound': mean_cost - 2*std_cost,
+            'upper_bound': mean_cost + 2*std_cost
+        })
+    
+    return costs_per_reverse
