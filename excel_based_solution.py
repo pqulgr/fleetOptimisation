@@ -252,78 +252,78 @@ def main_excel():
                 st.session_state.data_loaded = True
             except Exception as e:
                 st.error(f"Erreur lors du chargement des données: {str(e)}")
-    
-    # Étape 2 : Entraînement du modèle
-    if 'data_loaded' in st.session_state and st.session_state.data_loaded and uploaded_file:
-        st.header("Entraînement du modèle")
-        epochs = st.slider("Nombre d'époques", min_value=10, max_value=1000, value=50, step=10)
-        nb_future_prediction = st.slider("Nombre de jours futur à prévoir", min_value=1, max_value=1000, value=30, step=1)
-        
-        if st.button("Entraîner le modèle"):
-            with st.spinner("Entraînement du modèle en cours..."):
-                df = st.session_state.df
-                scaler = MinMaxScaler(feature_range=(0, 1))
-                scaled_data = scaler.fit_transform(df[colis_column].values.reshape(-1, 1))
-
-                seq_length = 30  # Utiliser 30 jours pour prédire le jour suivant
-                X, y = create_sequences(scaled_data, df[date_column], seq_length)
-
-                # Diviser en ensembles d'entraînement et de test
-                train_size = int(len(X) * 0.8)
-                X_train, X_test = X[:train_size], X[train_size:]
-                y_train, y_test = y[:train_size], y[train_size:]
-
-                # Reshape pour l'entrée LSTM [samples, time steps, features]
-                X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], X_train.shape[2]))
-                X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], X_train.shape[2]))
+            
+            # Étape 2 : Entraînement du modèle
+            if 'data_loaded' in st.session_state and st.session_state.data_loaded and uploaded_file:
+                st.header("Entraînement du modèle")
+                epochs = st.slider("Nombre d'époques", min_value=10, max_value=1000, value=80, step=10)
+                nb_future_prediction = st.slider("Nombre de jours futur à prévoir", min_value=1, max_value=1000, value=135, step=1)
                 
-                model, history = train_model(X_train, y_train, epochs)
-                st.empty()
-                
-                st.session_state.model = model
-                st.session_state.history = history
-                st.session_state.scaler = scaler
-                st.session_state.X_train = X_train
-                st.session_state.y_train = y_train
-                st.session_state.X_test = X_test
-                st.session_state.y_test = y_test
-                st.session_state.train_size = train_size
-                st.session_state.seq_length = seq_length
-                
-                st.success("Modèle entraîné avec succès!")
-    
-    # Étape 3 : Affichage des résultats
-    if 'model' in st.session_state:
-        st.header("Résultats de l'entraînement")
-        
-        # Afficher la courbe de perte
-        st.subheader("Courbes d'apprentissage")
-        st.plotly_chart(plot_learning_curves(st.session_state.history))
-        
-        with st.spinner("Prédiction du modèle en cours..."):
-            # Faire des prédictions
-            train_predict = st.session_state.model.predict(st.session_state.X_train)
-            test_predict = st.session_state.model.predict(st.session_state.X_test)
-            train_predict = st.session_state.scaler.inverse_transform(train_predict)
-            test_predict = st.session_state.scaler.inverse_transform(test_predict)
+                if st.button("Entraîner le modèle"):
+                    with st.spinner("Entraînement du modèle en cours..."):
+                        df = st.session_state.df
+                        scaler = MinMaxScaler(feature_range=(0, 1))
+                        scaled_data = scaler.fit_transform(df[colis_column].values.reshape(-1, 1))
 
-            # Prédire les 30 prochains jours
-            last_sequence = np.concatenate((scaled_data[-seq_length:], cyclic_encoding(df[date_column].iloc[-seq_length:])), axis=1)
-            last_date = st.session_state.df[date_column].iloc[-1]
-            future_predictions = predict_future(model, last_sequence, last_date, nb_future_prediction, scaler)
-        
-        # Afficher les prédictions vs réalité
-        st.subheader("Prédictions vs Réalité")
-        st.plotly_chart(plot_predictions(
-            st.session_state.df, 
-            train_predict, 
-            test_predict, 
-            future_predictions, 
-            st.session_state.train_size, 
-            st.session_state.seq_length,
-            date_column,
-            colis_column
-        ))
+                        seq_length = 50  # Utiliser 30 jours pour prédire le jour suivant
+                        X, y = create_sequences(scaled_data, df[date_column], seq_length)
+
+                        # Diviser en ensembles d'entraînement et de test
+                        train_size = int(len(X) * 0.8)
+                        X_train, X_test = X[:train_size], X[train_size:]
+                        y_train, y_test = y[:train_size], y[train_size:]
+
+                        # Reshape pour l'entrée LSTM [samples, time steps, features]
+                        X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], X_train.shape[2]))
+                        X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], X_train.shape[2]))
+                        
+                        model, history = train_model(X_train, y_train, epochs)
+                        st.empty()
+                        
+                        st.session_state.model = model
+                        st.session_state.history = history
+                        st.session_state.scaler = scaler
+                        st.session_state.X_train = X_train
+                        st.session_state.y_train = y_train
+                        st.session_state.X_test = X_test
+                        st.session_state.y_test = y_test
+                        st.session_state.train_size = train_size
+                        st.session_state.seq_length = seq_length
+                        
+                        st.success("Modèle entraîné avec succès!")
+            
+                # Étape 3 : Affichage des résultats
+                if 'model' in st.session_state:
+                    st.header("Résultats de l'entraînement")
+                    
+                    # Afficher la courbe de perte
+                    st.subheader("Courbes d'apprentissage")
+                    st.plotly_chart(plot_learning_curves(st.session_state.history))
+                    
+                    with st.spinner("Prédiction du modèle en cours..."):
+                        # Faire des prédictions
+                        train_predict = st.session_state.model.predict(st.session_state.X_train)
+                        test_predict = st.session_state.model.predict(st.session_state.X_test)
+                        train_predict = st.session_state.scaler.inverse_transform(train_predict)
+                        test_predict = st.session_state.scaler.inverse_transform(test_predict)
+
+                        # Prédire les seq_length prochains jours
+                        last_sequence = np.concatenate((scaled_data[-seq_length:], cyclic_encoding(df[date_column].iloc[-seq_length:])), axis=1)
+                        last_date = st.session_state.df[date_column].iloc[-1]
+                        future_predictions = predict_future(model, last_sequence, last_date, nb_future_prediction, scaler)
+                    
+                    # Afficher les prédictions vs réalité
+                    st.subheader("Prédictions vs Réalité")
+                    st.plotly_chart(plot_predictions(
+                        st.session_state.df, 
+                        train_predict, 
+                        test_predict, 
+                        future_predictions, 
+                        st.session_state.train_size, 
+                        st.session_state.seq_length,
+                        date_column,
+                        colis_column
+                    ))
 
 if __name__ == "__main__":
     main_excel()
