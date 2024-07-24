@@ -6,8 +6,10 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Input, Dropout
 from tensorflow.keras.optimizers import Adam
 import plotly.graph_objects as go
+import plotly.express as px
 from plotly.subplots import make_subplots
 from tensorflow.keras.callbacks import Callback
+from statsmodels.tsa.seasonal import seasonal_decompose
 
 # Fonction pour prétraiter les données
 def preprocess(uploaded_file, date_column, colis_column):
@@ -153,6 +155,52 @@ def plot_predictions(df, train_predict, test_predict, future_predict, train_size
                       legend_title='Légende')
     return fig
 
+def plot_average_by_weekday(df, date_column, colis_column):
+    df['Weekday'] = df[date_column].dt.day_name()
+    avg_by_weekday = df.groupby('Weekday')[colis_column].mean().reindex(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])
+    
+    fig = px.line(x=avg_by_weekday.index, y=avg_by_weekday.values, 
+                  labels={'x': 'Jour de la semaine', 'y': 'Nombre moyen de colis'},
+                  title='Demande moyenne par jour de la semaine')
+    return fig
+
+def plot_monthly_evolution(df, date_column, colis_column):
+    df['YearMonth'] = df[date_column].dt.to_period('M')
+    monthly_avg = df.groupby('YearMonth')[colis_column].mean().reset_index()
+    monthly_avg['YearMonth'] = monthly_avg['YearMonth'].astype(str)
+    
+    fig = px.line(monthly_avg, x='YearMonth', y=colis_column,
+                  labels={'YearMonth': 'Mois', colis_column: 'Nombre moyen de colis'},
+                  title='Évolution mensuelle de la demande')
+    fig.update_xaxes(tickangle=45)
+    return fig
+
+def plot_global_trend(df, date_column, colis_column):
+    df['Date'] = pd.to_datetime(df[date_column])
+    df = df.sort_values('Date')
+    
+    fig = px.scatter(df, x='Date', y=colis_column, trendline="lowess",
+                     labels={colis_column: 'Nombre de colis'},
+                     title='Tendance globale de la demande')
+    return fig
+
+def perform_seasonal_decomposition(df, date_column, colis_column):
+    from statsmodels.tsa.seasonal import seasonal_decompose
+    
+    df['Date'] = pd.to_datetime(df[date_column])
+    df = df.sort_values('Date').set_index('Date')
+    
+    result = seasonal_decompose(df[colis_column], model='additive', period=7)
+    
+    fig = make_subplots(rows=4, cols=1, subplot_titles=('Observé', 'Tendance', 'Saisonnier', 'Résiduel'))
+    fig.add_trace(go.Scatter(x=result.observed.index, y=result.observed, mode='lines', name='Observé'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=result.trend.index, y=result.trend, mode='lines', name='Tendance'), row=2, col=1)
+    fig.add_trace(go.Scatter(x=result.seasonal.index, y=result.seasonal, mode='lines', name='Saisonnier'), row=3, col=1)
+    fig.add_trace(go.Scatter(x=result.resid.index, y=result.resid, mode='lines', name='Résiduel'), row=4, col=1)
+    
+    fig.update_layout(height=900, title_text="Décomposition saisonnière de la demande")
+    return fig
+
 # Application Streamlit
 def main_excel():
     if 'step' not in st.session_state:
@@ -185,6 +233,21 @@ def main_excel():
                 
                 # Afficher le graphique des données d'entrée
                 st.plotly_chart(plot_input_data(df, date_column, colis_column))
+                st.header("Analyse des données")
+                
+                df = st.session_state.df
+                
+                st.subheader("Demande moyenne par jour de la semaine")
+                st.plotly_chart(plot_average_by_weekday(df, date_column, colis_column))
+                
+                st.subheader("Évolution mensuelle de la demande")
+                st.plotly_chart(plot_monthly_evolution(df, date_column, colis_column))
+                
+                st.subheader("Tendance globale de la demande")
+                st.plotly_chart(plot_global_trend(df, date_column, colis_column))
+                
+                st.subheader("Décomposition saisonnière de la demande")
+                st.plotly_chart(perform_seasonal_decomposition(df, date_column, colis_column))
                 
                 st.session_state.data_loaded = True
             except Exception as e:
