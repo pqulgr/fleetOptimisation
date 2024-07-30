@@ -71,8 +71,6 @@ def main_excel():
             st.session_state.app_state['analyzer'].model_components['seasonality'] = st.checkbox("Inclure la saisonnalité", value=True)
             st.session_state.app_state['analyzer'].model_components['artificial_noise'] = st.checkbox("Inclure du bruit", value=True)
 
-
-            
             st.session_state.app_state['analyzer'].model_params['future_periods'] = st.slider("Nombre de jours à prédire", 
                                                                 min_value=10, max_value=1000, 
                                                                 value=st.session_state.app_state['analyzer'].model_params['future_periods'])

@@ -23,4 +23,4 @@ data/
 
 explore_rnn.ipynb
 
-lightnight*
+lightning_logs/
