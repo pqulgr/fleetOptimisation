@@ -68,7 +68,7 @@ class FleetEstimator:
 
         for day in range(n_days):
             if day > 0:
-                future_days = np.arange(day + reverse_time, min(day + reverse_time + 1, n_days))
+                future_days = reverse_time
                 np.add.at(available_returns, future_days, demand[day - 1])
 
             if day % reverse_time == 0:
@@ -101,15 +101,19 @@ class FleetEstimator:
 
         return cost
 
-    def plot_stock_over_time(self):
+    def plot_stock_over_time(self, reverse_time=None):
+        if reverse_time is None:
+            reverse_time = self.best_reverse_time
+
+        data = self.results[reverse_time]
         fig = go.Figure()
 
-        fig.add_trace(go.Scatter(x=self.combined_data['ds'], y=self.combined_data['stock'], mode='lines', name='Stock'))
+        fig.add_trace(go.Scatter(x=self.combined_data['ds'], y=data['stock'], mode='lines', name='Stock'))
         fig.add_trace(go.Scatter(x=self.combined_data['ds'], y=self.combined_data['demand'], mode='lines', name='Demande'))
-        fig.add_trace(go.Scatter(x=self.combined_data['ds'], y=self.combined_data['pending_returns'], mode='lines', name='Retours en attente'))
+        fig.add_trace(go.Scatter(x=self.combined_data['ds'], y=data['pending_returns'], mode='lines', name='Retours'))
 
         fig.update_layout(
-            title='Évolution du stock, de la demande et des retours au fil du temps',
+            title=f'Évolution du stock, de la demande et des retours au fil du temps (Reverse: {reverse_time} jours)',
             xaxis_title='Date',
             yaxis_title='Quantité',
             hovermode='x'
