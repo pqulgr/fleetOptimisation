@@ -109,7 +109,7 @@ def get_manual_inputs(use_file=False):
             else:
                 sheet_name = None
             date_column = st.text_input("Nom de la colonne des dates", "Date")
-            colis_column = st.text_input("Nom de la colonne des ventes/colis", "Ventes")
+            colis_column = st.text_input("Nom de la colonne des ventes/colis", "nombre de colis")
             
             if st.button("Analyser le fichier"):
                 df = load_data(uploaded_file, date_column, colis_column, sheet_name)
