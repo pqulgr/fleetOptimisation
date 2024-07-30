@@ -81,30 +81,27 @@ def run_simulation(n_simulations, n_jours, params_client, params_reverse, cost_o
 
 def main():
     
-    menu = ["Simulation", "Documentation"]
     st.set_page_config(layout="wide")
-    choice = st.sidebar.selectbox("Menu", menu)
     
-    if choice=="Simulation":
-        st.title("Simulation de Stock")
-        excel_based = st.selectbox("Choix du traitement", ("Traitement par IA a base du fichier Excel", "Traitement par loi normale"))
-        if excel_based=="Traitement par IA a base du fichier Excel":
-            main_excel()
-        else:
-            n_jours = st.number_input("Nombre de jours pour la simulation", min_value=1, step=1, value=30)
-            n_simulations = st.number_input("Nombre de simulations", min_value=1, step=1, value=400)
-            seuil_confiance = st.number_input("Seuil de confiance (en %)", min_value=0.0, max_value=100.0, value=95.0) / 100.0
+    st.title("Simulation de Stock")
+    menu = st.selectbox("Choix du traitement", ("Traitement par IA a base du fichier Excel", "Traitement par loi normale", "Documentation"))
+    if menu=="Traitement par IA a base du fichier Excel":
+        main_excel()
+    elif menu=="Traitement par loi normale":
+        n_jours = st.number_input("Nombre de jours pour la simulation", min_value=1, step=1, value=30)
+        n_simulations = st.number_input("Nombre de simulations", min_value=1, step=1, value=400)
+        seuil_confiance = st.number_input("Seuil de confiance (en %)", min_value=0.0, max_value=100.0, value=95.0) / 100.0
             
-            params_client, params_reverse = get_manual_inputs()
-            cost_option, cost_params = get_cost_options()
+        params_client, params_reverse = get_manual_inputs()
+        cost_option, cost_params = get_cost_options()
             
-            if st.button("Lancer la simulation") and params_client and params_reverse:
-                if cost_params.get("reverse_time"):
-                    reverse_time = cost_params["reverse_time"]
-                else:
-                    reverse_time = 1
-                run_simulation(n_simulations, n_jours, params_client, params_reverse, cost_option, cost_params, seuil_confiance, reverse_time)
-    if choice == "Documentation":
+        if st.button("Lancer la simulation") and params_client and params_reverse:
+            if cost_params.get("reverse_time"):
+                reverse_time = cost_params["reverse_time"]
+            else:
+                reverse_time = 1
+            run_simulation(n_simulations, n_jours, params_client, params_reverse, cost_option, cost_params, seuil_confiance, reverse_time)
+    else:
         show_documentation()
 
 if __name__ == "__main__":

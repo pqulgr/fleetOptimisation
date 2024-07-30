@@ -1,329 +1,303 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-from sklearn.preprocessing import MinMaxScaler
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Input, Dropout
-from tensorflow.keras.optimizers import Adam
-import plotly.graph_objects as go
+import plotly.graph_objs as go
 import plotly.express as px
 from plotly.subplots import make_subplots
-from tensorflow.keras.callbacks import Callback
-from statsmodels.tsa.seasonal import seasonal_decompose
+from neuralprophet import NeuralProphet
+from typing import Dict, Any
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-# Fonction pour prétraiter les données
-def preprocess(uploaded_file, date_column, colis_column):
+
+def load_data(uploaded_file, date_column, colis_column, sheet_name=None):
     file_type = uploaded_file.name.split('.')[-1].lower()
     
     if file_type == 'xlsx':
-        df = pd.read_excel(uploaded_file, index_col=None)
+        # Si sheet_name est None, pd.read_excel chargera la première feuille par défaut
+        df = pd.read_excel(uploaded_file, sheet_name=sheet_name, index_col=None)
     elif file_type == 'csv':
         df = pd.read_csv(uploaded_file, index_col=None)
     else:
-        return "Format de fichier non pris en charge"
+        raise ValueError("Format de fichier non pris en charge")
     
     if date_column not in df.columns or colis_column not in df.columns:
         raise ValueError(f"Le fichier doit contenir les colonnes '{date_column}' et '{colis_column}'")
     
     df[date_column] = pd.to_datetime(df[date_column])
     df[colis_column] = df[colis_column].fillna(0).astype(int)
+    df_copy = df.rename(columns={date_column: "ds", colis_column: "y"})[["ds","y"]].copy()
     
-    return df
+    return df_copy
 
-def cyclic_encoding(dates):
-    # Convert dates to day of the week (0 for Monday, 6 for Sunday)
-    days = dates.dt.dayofweek  # Utiliser dt.dayofweek pour les séries pandas
-    
-    # Encode cyclically
-    encoding = np.column_stack([
-        np.sin(2 * np.pi * days / 7),
-        np.cos(2 * np.pi * days / 7)
-    ])
-    
-    return encoding
-
-def create_sequences(data, dates, seq_length):
-    X, y = [], []
-    cyclic_encoded = cyclic_encoding(dates)
-    
-    for i in range(len(data) - seq_length):
-        X.append(np.column_stack((data[i:(i + seq_length)], cyclic_encoded[i:(i + seq_length)])))
-        y.append(data[i + seq_length])
-    
-    return np.array(X), np.array(y)
-
-class ProgressCallback(Callback):
-    def __init__(self, epochs):
-        super().__init__()
-        self.progress_bar = st.progress(0)
-        self.epochs = epochs
-
-    def on_epoch_end(self, epoch, logs=None):
-        progress = (epoch + 1) / self.epochs
-        self.progress_bar.progress(progress)
-
-
-def train_model(X_train, y_train, epochs):
-    model = Sequential([
-        Input((X_train.shape[1], X_train.shape[2])),
-        LSTM(64, return_sequences=True),
-        Dropout(0.2),
-        LSTM(32),
-        Dropout(0.2),
-        Dense(16, activation='relu'),
-        Dense(1, activation='relu')
-    ])
-    model.compile(optimizer=Adam(learning_rate=0.001), loss='mse')
-    progress_callback = ProgressCallback(epochs)
-        
-    history = model.fit(
-        X_train, y_train, 
-        epochs=epochs, 
-        batch_size=32, 
-        validation_split=0.1, 
-        verbose=0,
-        callbacks=[progress_callback]
-    )
-    return model, history
-
-def predict_future(model, last_sequence, last_date, num_steps, scaler):
-    future_predictions = []
-
-    for _ in range(num_steps):
-        # Préparer l'entrée pour le modèle
-        last_sequence = np.expand_dims(last_sequence, axis=0)  # Ajouter la dimension du batch
-
-        # Prédire la prochaine valeur
-        next_value = model.predict(last_sequence)[0, 0]  # Extraire la prédiction
-
-        # Ajouter la prédiction à la liste des prédictions
-        future_predictions.append(next_value)
-
-        # Convertir last_date en série pandas pour utiliser cyclic_encoding
-        last_date_series = pd.Series([last_date])
-
-        # Mettre à jour la séquence initiale en supprimant le premier pas de temps
-        # et en ajoutant la nouvelle prédiction comme nouveau contexte
-        new_context = np.concatenate((np.array([[next_value]]), cyclic_encoding(last_date_series)), axis=1)
-        last_sequence = np.vstack((last_sequence[0, 1:], new_context))
-        last_date = last_date + pd.Timedelta(days=1)
-
-    future_predictions = scaler.inverse_transform(np.array(future_predictions).reshape(-1, 1))
-    return future_predictions
-
-def plot_learning_curves(history):
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(y=history.history['loss'], name="Perte d'entraînement"))
-    fig.add_trace(go.Scatter(y=history.history['val_loss'], name='Perte de validation'))
-    fig.update_layout(title="Courbes d'apprentissage",
-                      xaxis_title='Époques',
-                      yaxis_title='Perte',
-                      legend_title='Légende')
+def plot_input_data(df):
+    fig = px.line(df, x="ds", y="y", title="Données d'exportation")
+    fig.update_layout(xaxis_title="Date", yaxis_title="Exportations")
     return fig
 
-def plot_input_data(df, date_column, colis_column):
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=df[date_column], y=df[colis_column], mode='lines', name='Exportations réelles'))
-    fig.update_layout(title="Données d'exportation",
-                      xaxis_title='Date',
-                      yaxis_title='Exportations',
-                      legend_title='Légende')
-    return fig
-
-def plot_predictions(df, train_predict, test_predict, future_predict, train_size, seq_length, date_column, colis_column):
-    fig = go.Figure()
-
-    # Données réelles
-    fig.add_trace(go.Scatter(x=df[date_column], y=df[colis_column], mode='lines', name='Réel', line=dict(color='blue')))
-
-    # Prédictions d'entraînement
-    train_dates = df[date_column][seq_length:train_size]
-    fig.add_trace(go.Scatter(x=train_dates, y=train_predict.flatten(), mode='lines', name='Prédictions d\'entraînement', line=dict(color='green')))
-
-    # Prédictions de test
-    test_dates = df[date_column][train_size+seq_length:]
-    fig.add_trace(go.Scatter(x=test_dates, y=test_predict.flatten(), mode='lines', name='Prédictions de test', line=dict(color='red')))
-
-    # Prédictions futures
-    last_date = df[date_column].iloc[-1]
-    future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=len(future_predict))
-    fig.add_trace(go.Scatter(x=future_dates, y=future_predict.flatten(), mode='lines', name='Prédictions futures', line=dict(color='purple')))
-
-    fig.update_layout(title="Prédictions d'exportation vs Réalité",
-                      xaxis_title='Date',
-                      yaxis_title='Exportations',
-                      legend_title='Légende')
-    return fig
-
-def plot_average_by_weekday(df, date_column, colis_column):
-    df['Weekday'] = df[date_column].dt.day_name()
-    avg_by_weekday = df.groupby('Weekday')[colis_column].mean().reindex(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])
+def plot_average_by_weekday(df):
+    df_copy = df.copy()
+    df_copy['Weekday'] = df_copy['ds'].dt.day_name()
+    avg_by_weekday = df_copy.groupby('Weekday')['y'].mean()
+    weekday_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    avg_by_weekday = avg_by_weekday.reindex(weekday_order)
     
     fig = px.line(x=avg_by_weekday.index, y=avg_by_weekday.values, 
                   labels={'x': 'Jour de la semaine', 'y': 'Nombre moyen de colis'},
                   title='Demande moyenne par jour de la semaine')
     return fig
 
-def plot_monthly_evolution(df, date_column, colis_column):
-    df['YearMonth'] = df[date_column].dt.to_period('M')
-    monthly_avg = df.groupby('YearMonth')[colis_column].mean().reset_index()
+def plot_monthly_evolution(df):
+    df_copy = df.copy()
+    df_copy['YearMonth'] = df_copy['ds'].dt.to_period('M')
+    monthly_avg = df_copy.groupby('YearMonth')['y'].mean().reset_index()
     monthly_avg['YearMonth'] = monthly_avg['YearMonth'].astype(str)
     
-    fig = px.line(monthly_avg, x='YearMonth', y=colis_column,
-                  labels={'YearMonth': 'Mois', colis_column: 'Nombre moyen de colis'},
+    fig = px.line(monthly_avg, x='YearMonth', y='y',
+                  labels={'YearMonth': 'Mois', 'y': 'Nombre moyen de colis'},
                   title='Évolution mensuelle de la demande')
     fig.update_xaxes(tickangle=45)
     return fig
 
-def plot_global_trend(df, date_column, colis_column):
-    df['Date'] = pd.to_datetime(df[date_column])
-    df = df.sort_values('Date')
+def plot_holiday_impact(forecast):
+    holidays = ['Armistice', 'Ascension', 'Assomption', 'Fête de la Victoire', 'Fête du Travail', 
+                'Fête nationale', "Jour de l'an", 'Lundi de Pentecôte', 'Lundi de Pâques', 
+                'Noël', 'Toussaint']
     
-    fig = px.scatter(df, x='Date', y=colis_column, trendline="lowess",
-                     labels={colis_column: 'Nombre de colis'},
-                     title='Tendance globale de la demande')
+    holiday_impact = forecast[['ds'] + [f'event_{h}' for h in holidays]].melt(id_vars=['ds'], 
+                                                                              var_name='holiday', 
+                                                                              value_name='impact')
+    holiday_impact['holiday'] = holiday_impact['holiday'].str.replace('event_', '')
+    
+    fig = px.box(holiday_impact, x='holiday', y='impact', 
+                 title="Impact des jours fériés sur la demande",
+                 labels={'holiday': 'Jour férié', 'impact': 'Impact sur la demande'})
+    fig.update_xaxes(tickangle=45)
     return fig
 
-def perform_seasonal_decomposition(df, date_column, colis_column):
-    from statsmodels.tsa.seasonal import seasonal_decompose
+def plot_seasonal_trends(forecast):
+    fig = make_subplots(rows=2, cols=1, subplot_titles=("Tendance annuelle", "Tendance hebdomadaire"))
     
-    df['Date'] = pd.to_datetime(df[date_column])
-    df = df.sort_values('Date').set_index('Date')
+    # Tendance annuelle
+    yearly_trend = forecast.groupby(forecast['ds'].dt.dayofyear)['season_yearly'].mean().reset_index()
+    fig.add_trace(go.Scatter(x=yearly_trend['ds'], y=yearly_trend['season_yearly'], 
+                             mode='lines', name='Tendance annuelle'), row=1, col=1)
     
-    result = seasonal_decompose(df[colis_column], model='additive', period=7)
+    # Tendance hebdomadaire
+    weekly_trend = forecast.groupby(forecast['ds'].dt.dayofweek)['season_weekly'].mean().reset_index()
+    fig.add_trace(go.Scatter(x=weekly_trend['ds'], y=weekly_trend['season_weekly'], 
+                             mode='lines', name='Tendance hebdomadaire'), row=2, col=1)
     
-    fig = make_subplots(rows=4, cols=1, subplot_titles=('Observé', 'Tendance', 'Saisonnier', 'Résiduel'))
-    fig.add_trace(go.Scatter(x=result.observed.index, y=result.observed, mode='lines', name='Observé'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=result.trend.index, y=result.trend, mode='lines', name='Tendance'), row=2, col=1)
-    fig.add_trace(go.Scatter(x=result.seasonal.index, y=result.seasonal, mode='lines', name='Saisonnier'), row=3, col=1)
-    fig.add_trace(go.Scatter(x=result.resid.index, y=result.resid, mode='lines', name='Résiduel'), row=4, col=1)
-    
-    fig.update_layout(height=900, title_text="Décomposition saisonnière de la demande")
+    fig.update_layout(height=600, title_text="Décomposition des tendances saisonnières")
     return fig
 
-# Application Streamlit
+def plot_residuals(df, forecast):
+    residuals = df['y'] - forecast['yhat1']
+    
+    fig = make_subplots(rows=2, cols=1, subplot_titles=("Résidus au fil du temps", "Distribution des résidus"))
+    
+    # Résidus au fil du temps
+    fig.add_trace(go.Scatter(x=df['ds'], y=residuals, mode='markers', name='Résidus'), row=1, col=1)
+    fig.add_hline(y=0, line_dash="dash", line_color="red", row=1, col=1)
+    
+    # Distribution des résidus
+    fig.add_trace(go.Histogram(x=residuals, name='Distribution des résidus'), row=2, col=1)
+    
+    fig.update_layout(height=600, title_text="Analyse des résidus")
+    return fig
+
+def calculate_model_metrics(df, model):
+    # Obtenir les prédictions sur les données d'entraînement
+    train_predictions = model.predict(df)
+    
+    y_true = df['y']
+    y_pred = train_predictions['yhat1'] if 'yhat1' in train_predictions.columns else train_predictions['yhat']
+    
+    mae = mean_absolute_error(y_true, y_pred)
+    mse = mean_squared_error(y_true, y_pred)
+    r2 = r2_score(y_true, y_pred)
+    
+    return mae, mse, r2
+
+def plot_forecast(df, forecast, train_predictions):
+    fig = go.Figure()
+    
+    # Données réelles
+    fig.add_trace(go.Scatter(x=df['ds'], y=df['y'], mode='lines', name='Données réelles'))
+    
+    # Prédictions d'entraînement
+    y_pred_train = 'yhat1' if 'yhat1' in train_predictions.columns else 'yhat'
+    fig.add_trace(go.Scatter(x=train_predictions['ds'], y=train_predictions[y_pred_train], 
+                             mode='lines', name='Prédictions d\'entraînement', line=dict(color='green')))
+    
+    # Prédictions futures
+    y_pred_future = 'yhat1' if 'yhat1' in forecast.columns else 'yhat'
+    fig.add_trace(go.Scatter(x=forecast['ds'], y=forecast[y_pred_future], 
+                             mode='lines', name='Prédictions futures', line=dict(color='red')))
+    
+    fig.update_layout(title="Prédictions vs Réalité", xaxis_title="Date", yaxis_title="Exportations")
+    return fig
+
+def initialize_session_state():
+    if 'data_loaded' not in st.session_state:
+        st.session_state.data_loaded = False
+    if 'df' not in st.session_state:
+        st.session_state.df = None
+    if 'model_trained' not in st.session_state:
+        st.session_state.model_trained = False
+    if 'forecast' not in st.session_state:
+        st.session_state.forecast = None
+    if 'model' not in st.session_state:
+        st.session_state.model = None
+    if 'model_params' not in st.session_state:
+        st.session_state.model_params = {
+            'future_periods': 300,
+            'epochs': 20,
+            'n_lags': 0
+        }
+    if 'regularization' not in st.session_state:
+        st.session_state.regularization = {
+            'trend': 0.1,
+            'seasonality': 0.1,
+            'auto_regression': 0.1,
+        }
+    if 'model_components' not in st.session_state:
+        st.session_state.model_components = {
+            'trend': True,
+            'seasonality': True,
+            'auto_regression': False,
+        }
+
+def load_data_button_click():
+    try:
+        st.session_state.df = load_data(st.session_state.uploaded_file, 
+                                        st.session_state.date_column, 
+                                        st.session_state.colis_column)
+        st.session_state.data_loaded = True
+        st.session_state.model_trained = False  # Reset model state when new data is loaded
+    except Exception as e:
+        st.error(f"Erreur lors du chargement des données : {str(e)}")
+        st.session_state.data_loaded = False
+
+def train_model_button_click():
+    if st.session_state.data_loaded:
+        with st.spinner("Entraînement du modèle en cours..."):
+            growth = "linear" if st.session_state.model_components['trend'] else "off"
+            n_lags = st.session_state.model_params['n_lags'] if st.session_state.model_components['auto_regression'] else 0
+            
+            m = NeuralProphet(
+                growth=growth,
+                yearly_seasonality=st.session_state.model_components['seasonality'],
+                weekly_seasonality=st.session_state.model_components['seasonality'],
+                daily_seasonality=False,
+                trend_reg=st.session_state.regularization['trend'],
+                seasonality_reg=st.session_state.regularization['seasonality'],
+                n_lags=n_lags,
+                n_forecasts=1,
+                ar_reg=st.session_state.regularization['auto_regression'] if st.session_state.model_components['auto_regression'] else None,
+                epochs=st.session_state.model_params['epochs']
+            )
+            m = m.add_country_holidays("FR")
+            metrics = m.fit(st.session_state.df, freq="D")
+
+        with st.spinner("Génération des prédictions..."):
+            # Prédictions sur les données d'entraînement
+            st.session_state.train_predictions = m.predict(st.session_state.df)
+            
+            # Prédictions futures
+            future = m.make_future_dataframe(st.session_state.df, 
+                                             periods=st.session_state.model_params['future_periods'])
+            st.session_state.forecast = m.predict(future)
+            y_pred_future = 'yhat1' if 'yhat1' in st.session_state.forecast.columns else 'yhat'
+            st.session_state.forecast[y_pred_future] = st.session_state.forecast[y_pred_future].apply(lambda x:max(x,0))
+        
+        st.session_state.model_trained = True
+        st.session_state.model = m
+        st.success("Modèle entraîné et prédictions générées avec succès!")
+    else:
+        st.error("Veuillez d'abord charger les données.")
+
 def main_excel():
-    if 'step' not in st.session_state:
-        st.session_state.step = 0
+    st.title("Analyse de données et prédiction des exportations")
     
-    st.title("Analyse de données et entraînement de modèle")
+    initialize_session_state()
     
-    # Étape 1 : Chargement du fichier
-    uploaded_file = st.file_uploader("Choisissez un fichier Excel ou CSV", type=["xlsx", "csv"])
+    st.session_state.uploaded_file = st.file_uploader("Choisissez un fichier Excel ou CSV", type=["xlsx", "csv"])
     
-    if uploaded_file is not None or st.session_state.step>=1:
-        st.session_state.step = max(st.session_state.step, 1)
+    if st.session_state.uploaded_file is not None:
+        file_type = st.session_state.uploaded_file.name.split('.')[-1].lower()
         
-        # Demander les noms des colonnes
-        date_column = st.text_input("Nom de la colonne de date", "Date")
-        colis_column = st.text_input("Nom de la colonne de nombre de colis", "nombre de colis")
+        st.session_state.date_column = st.text_input("Nom de la colonne de date", "Date")
+        st.session_state.colis_column = st.text_input("Nom de la colonne de nombre de colis", "nombre de colis")
         
-        if st.button("Charger les données") or st.session_state.step>=2:
-            st.session_state.step = max(st.session_state.step, 2)
+        if file_type == 'xlsx':
+            # Obtenir la liste des noms de feuilles
+            xls = pd.ExcelFile(st.session_state.uploaded_file)
+            sheet_names = xls.sheet_names
+            
+            # Ajouter un sélecteur de feuille
+            selected_sheet = st.selectbox("Choisissez une feuille (optionnel)", [""] + sheet_names)
+            
+            # Si aucune feuille n'est sélectionnée, on passe None à la fonction load_data
+            sheet_name = selected_sheet if selected_sheet != "" else None
+        else:
+            sheet_name = None
+        
+        if st.button("Charger les données"):
             try:
-                df = preprocess(uploaded_file, date_column, colis_column)
-                st.session_state.df = df
-                st.success("Données chargées avec succès!")
-                
-                # Afficher quelques informations sur les données
-                st.write("Aperçu des données:")
-                st.write(df.head())
-                st.write(f"Nombre total d'enregistrements: {len(df)}")
-                st.write(f"Période couverte: du {df[date_column].min()} au {df[date_column].max()}")
-                
-                # Afficher le graphique des données d'entrée
-                st.plotly_chart(plot_input_data(df, date_column, colis_column))
-                st.header("Analyse des données")
-                
-                df = st.session_state.df
-                
-                st.subheader("Demande moyenne par jour de la semaine")
-                st.plotly_chart(plot_average_by_weekday(df, date_column, colis_column))
-                
-                st.subheader("Évolution mensuelle de la demande")
-                st.plotly_chart(plot_monthly_evolution(df, date_column, colis_column))
-                
-                st.subheader("Tendance globale de la demande")
-                st.plotly_chart(plot_global_trend(df, date_column, colis_column))
-                
-                st.subheader("Décomposition saisonnière de la demande")
-                st.plotly_chart(perform_seasonal_decomposition(df, date_column, colis_column))
-                
+                st.session_state.df = load_data(st.session_state.uploaded_file, 
+                                                st.session_state.date_column, 
+                                                st.session_state.colis_column,
+                                                sheet_name)
                 st.session_state.data_loaded = True
+                st.session_state.model_trained = False  # Reset model state when new data is loaded
+                st.success("Données chargées et préparées avec succès!")
             except Exception as e:
-                st.error(f"Erreur lors du chargement des données: {str(e)}")
+                st.error(f"Erreur lors du chargement des données : {str(e)}")
+                st.session_state.data_loaded = False
+        
+        
+        if st.session_state.data_loaded:            
+            st.subheader("Aperçu des données")
+            st.write(st.session_state.df.head())
+            st.write(f"Nombre total d'enregistrements: {len(st.session_state.df)}")
+            st.write(f"Période couverte: du {st.session_state.df['ds'].min()} au {st.session_state.df['ds'].max()}")
             
-            # Étape 2 : Entraînement du modèle
-            if 'data_loaded' in st.session_state and st.session_state.data_loaded and uploaded_file:
-                st.header("Entraînement du modèle")
-                epochs = st.slider("Nombre d'époques", min_value=10, max_value=1000, value=80, step=10)
-                nb_future_prediction = st.slider("Nombre de jours futur à prévoir", min_value=1, max_value=1000, value=135, step=1)
-                
-                if st.button("Entraîner le modèle"):
-                    with st.spinner("Entraînement du modèle en cours..."):
-                        df = st.session_state.df
-                        scaler = MinMaxScaler(feature_range=(0, 1))
-                        scaled_data = scaler.fit_transform(df[colis_column].values.reshape(-1, 1))
-
-                        seq_length = 50  # Utiliser 30 jours pour prédire le jour suivant
-                        X, y = create_sequences(scaled_data, df[date_column], seq_length)
-
-                        # Diviser en ensembles d'entraînement et de test
-                        train_size = int(len(X) * 0.8)
-                        X_train, X_test = X[:train_size], X[train_size:]
-                        y_train, y_test = y[:train_size], y[train_size:]
-
-                        # Reshape pour l'entrée LSTM [samples, time steps, features]
-                        X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], X_train.shape[2]))
-                        X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], X_train.shape[2]))
-                        
-                        model, history = train_model(X_train, y_train, epochs)
-                        st.empty()
-                        
-                        st.session_state.model = model
-                        st.session_state.history = history
-                        st.session_state.scaler = scaler
-                        st.session_state.X_train = X_train
-                        st.session_state.y_train = y_train
-                        st.session_state.X_test = X_test
-                        st.session_state.y_test = y_test
-                        st.session_state.train_size = train_size
-                        st.session_state.seq_length = seq_length
-                        
-                        st.success("Modèle entraîné avec succès!")
+            st.plotly_chart(plot_input_data(st.session_state.df))
             
-                # Étape 3 : Affichage des résultats
-                if 'model' in st.session_state:
-                    st.header("Résultats de l'entraînement")
-                    
-                    # Afficher la courbe de perte
-                    st.subheader("Courbes d'apprentissage")
-                    st.plotly_chart(plot_learning_curves(st.session_state.history))
-                    
-                    with st.spinner("Prédiction du modèle en cours..."):
-                        # Faire des prédictions
-                        train_predict = st.session_state.model.predict(st.session_state.X_train)
-                        test_predict = st.session_state.model.predict(st.session_state.X_test)
-                        train_predict = st.session_state.scaler.inverse_transform(train_predict)
-                        test_predict = st.session_state.scaler.inverse_transform(test_predict)
+            col1, col2 = st.columns(2)
+            with col1:
+                st.plotly_chart(plot_average_by_weekday(st.session_state.df))
+            with col2:
+                st.plotly_chart(plot_monthly_evolution(st.session_state.df))
+            
+            st.subheader("Configuration du modèle NeuralProphet")
+            st.session_state.model_components['trend'] = st.checkbox("Inclure la tendance", value=True)
+            st.session_state.model_components['seasonality'] = st.checkbox("Inclure la saisonnalité", value=True)
+            
+            st.session_state.model_params['future_periods'] = st.slider("Nombre de jours à prédire", 
+                                                                        min_value=10, max_value=1000, 
+                                                                        value=st.session_state.model_params['future_periods'])
+            st.session_state.model_params['epochs'] = st.slider("Nombre d'époques", 
+                                                                min_value=10, max_value=300, 
+                                                                value=st.session_state.model_params['epochs'])
 
-                        # Prédire les seq_length prochains jours
-                        last_sequence = np.concatenate((scaled_data[-seq_length:], cyclic_encoding(df[date_column].iloc[-seq_length:])), axis=1)
-                        last_date = st.session_state.df[date_column].iloc[-1]
-                        future_predictions = predict_future(model, last_sequence, last_date, nb_future_prediction, scaler)
-                    
-                    # Afficher les prédictions vs réalité
-                    st.subheader("Prédictions vs Réalité")
-                    st.plotly_chart(plot_predictions(
-                        st.session_state.df, 
-                        train_predict, 
-                        test_predict, 
-                        future_predictions, 
-                        st.session_state.train_size, 
-                        st.session_state.seq_length,
-                        date_column,
-                        colis_column
-                    ))
+            if st.button("Entraîner le modèle et faire des prédictions"):
+                train_model_button_click()
+            
+            if st.session_state.model_trained:
+                try:
+                    forecast_plot = plot_forecast(st.session_state.df, st.session_state.forecast, st.session_state.train_predictions)
+                    st.plotly_chart(forecast_plot)
+                    st.plotly_chart(plot_holiday_impact(st.session_state.forecast))
+                    st.plotly_chart(plot_seasonal_trends(st.session_state.forecast))
+                    st.plotly_chart(plot_residuals(st.session_state.df, st.session_state.train_predictions))
+                    mae, mse, r2 = calculate_model_metrics(st.session_state.df, st.session_state.model)
+                    st.subheader("Métriques de performance du modèle (sur les données d'entraînement)")
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("MAE", f"{mae:.2f}")
+                    col2.metric("MSE", f"{mse:.2f}")
+                    col3.metric("R²", f"{r2:.2f}")
+                except Exception as e:
+                    st.error(f"Erreur lors de la création des graphiques : {str(e)}")
 
 if __name__ == "__main__":
     main_excel()
