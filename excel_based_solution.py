@@ -69,6 +69,9 @@ def main_excel():
             st.subheader("Configuration du modèle NeuralProphet")
             st.session_state.app_state['analyzer'].model_components['trend'] = st.checkbox("Inclure la tendance", value=True)
             st.session_state.app_state['analyzer'].model_components['seasonality'] = st.checkbox("Inclure la saisonnalité", value=True)
+            st.session_state.app_state['analyzer'].model_components['artificial_noise'] = st.checkbox("Inclure du bruit", value=True)
+
+
             
             st.session_state.app_state['analyzer'].model_params['future_periods'] = st.slider("Nombre de jours à prédire", 
                                                                 min_value=10, max_value=1000, 

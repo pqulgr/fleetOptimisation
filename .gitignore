@@ -22,3 +22,5 @@ data/
 *.xlsx
 
 explore_rnn.ipynb
+
+lightnight*

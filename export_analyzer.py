@@ -5,6 +5,7 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 from neuralprophet import NeuralProphet
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+import numpy as np
 
 class ExportAnalyzer:
     def __init__(self):
@@ -22,6 +23,7 @@ class ExportAnalyzer:
             'trend': True,
             'seasonality': True,
             'auto_regression': False,
+            'artificial_noise':False
         }
 
     def load_data(self, uploaded_file, date_column, colis_column, sheet_name=None):
@@ -81,6 +83,25 @@ class ExportAnalyzer:
                       title='Évolution mensuelle de la demande')
         fig.update_xaxes(tickangle=45)
         return fig
+    
+    def add_noise(self, y_predictions, y_pred_future):
+        # Calculer la différence entre les données réelles et les prédictions sur les données d'entraînement
+        y_true = self.df['y']
+        y_pred_train = self.train_predictions[y_pred_future]
+        
+        residuals = y_true - y_pred_train
+        
+        # Calculer la moyenne et l'écart-type des résidus
+        #mean_residual = np.mean(residuals)
+        #std_residual = np.std(residuals)
+        
+        # Générer du bruit basé sur la distribution des résidus
+        noise = np.random.choice(residuals, size=len(y_predictions))
+        
+        # Ajouter le bruit aux prédictions futures
+        noisy_predictions = np.array([y_predictions[i] + noise[i] if y_predictions[i]>0 else y_predictions[i] for i in range(len(noise))])
+        
+        return noisy_predictions
 
     def train_model(self):
         growth = "linear" if self.model_components['trend'] else "off"
@@ -102,7 +123,9 @@ class ExportAnalyzer:
                                                   periods=self.model_params['future_periods'])
         self.forecast = self.model.predict(future)
         y_pred_future = 'yhat1' if 'yhat1' in self.forecast.columns else 'yhat'
-        self.forecast[y_pred_future] = self.forecast[y_pred_future].apply(lambda x:max(x,0))
+        if self.model_components['artificial_noise']:
+            self.forecast[y_pred_future] = self.add_noise(self.forecast[y_pred_future], y_pred_future)
+        self.forecast[y_pred_future] = self.forecast[y_pred_future].apply(lambda x: max(x, 0))
         
         self.model_trained = True
         return metrics
