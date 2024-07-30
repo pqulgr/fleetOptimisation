@@ -1,14 +1,40 @@
 import streamlit as st
 import pandas as pd
 from export_analyzer import ExportAnalyzer
+from fleet_estimator import FleetEstimator
 
 def initialize_session_state():
-    if 'analyzer' not in st.session_state:
-        st.session_state.analyzer = ExportAnalyzer()
-    if 'data_loaded' not in st.session_state:
-        st.session_state.data_loaded = False
-    if 'model_trained' not in st.session_state:
-        st.session_state.model_trained = False
+    if 'app_state' not in st.session_state:
+        st.session_state.app_state = {
+            'analyzer': ExportAnalyzer(),
+            'data_loaded': False,
+            'model_trained': False,
+            'fleet_estimated': False,
+            'fleet_estimator': None,
+            'fleet_size': None,
+            'cost_option': None,
+            'cost_params': None
+        }
+
+def get_cost_options():
+    cost_params = {}
+    cost_option = None
+    cost_option = st.selectbox("Sélectionnez une option de coût", ("Coût basé sur les points de collecte", "Coût basé sur le poids"))
+    cost_option = "Option 1" if cost_option=="Coût basé sur les points de collecte" else "Option 2"
+    if cost_option == "Option 1":
+        cost_params["reverse_time"] = st.slider("Délai avant reverse (jours)", min_value=1, max_value=20, value=(1,3), step=1)
+        cost_params["nb_locations"] = st.number_input("Nombre de destinations", min_value=1, step=1, value=1)
+        cost_params["cost_emballage"] = st.number_input("Coût d'achat des emballages", min_value=0.0, step=0.01, value=2.0)
+        cost_params["cost_location"] = st.number_input("Coût de récupération à un point relai", min_value=0.0, step=0.1, value=5.0)
+        cost_params["cost_per_demand"] = st.number_input("Coût par envoi", min_value=0.0, step=0.1, value=1.0)
+    elif cost_option == "Option 2":
+        cost_params["reverse_time"] = st.number_input("Délai avant reverse (jours)", min_value=1, step=1, value=3)
+        cost_params["cost_emballage"] = st.number_input("Coût d'achat des emballages", min_value=0.0, step=0.01, value=2.0)
+        cost_params["poids_sac"] = st.number_input("Poids moyen", min_value=0.0, step=0.1, value=1.0)
+        cost_params["cost_per_demand"] = st.number_input("Coût par envoi par Kg", min_value=0.0, step=0.1, value=1.0)
+        cost_params["cost_per_return"] = st.number_input("Coût par retour par Kg", min_value=0.0, step=0.1, value=1.0)
+
+    return cost_option, cost_params
 
 def main_excel():
     st.title("Analyse de données et prédiction des exportations")
@@ -31,55 +57,91 @@ def main_excel():
             sheet_name = None if selected_sheet == "Première feuille" else selected_sheet
         
         if st.button("Charger les données"):
-            if st.session_state.analyzer.load_data(uploaded_file, date_column, colis_column, sheet_name):
-                st.session_state.data_loaded = True
+            if st.session_state.app_state['analyzer'].load_data(uploaded_file, date_column, colis_column, sheet_name):
+                st.session_state.app_state['data_loaded'] = True
                 st.success("Données chargées et préparées avec succès!")
+            else:
+                st.error("Erreur lors du chargement des données.")
         
-        if st.session_state.data_loaded:            
-            st.subheader("Aperçu des données")
-            st.write(st.session_state.analyzer.df.head())
-            st.write(f"Nombre total d'enregistrements: {len(st.session_state.analyzer.df)}")
-            st.write(f"Période couverte: du {st.session_state.analyzer.df['ds'].min()} au {st.session_state.analyzer.df['ds'].max()}")
-            
-            st.plotly_chart(st.session_state.analyzer.plot_input_data())
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.plotly_chart(st.session_state.analyzer.plot_average_by_weekday())
-            with col2:
-                st.plotly_chart(st.session_state.analyzer.plot_monthly_evolution())
+        if st.session_state.app_state['data_loaded']:
+            display_data_analysis()
             
             st.subheader("Configuration du modèle NeuralProphet")
-            st.session_state.analyzer.model_components['trend'] = st.checkbox("Inclure la tendance", value=True)
-            st.session_state.analyzer.model_components['seasonality'] = st.checkbox("Inclure la saisonnalité", value=True)
+            st.session_state.app_state['analyzer'].model_components['trend'] = st.checkbox("Inclure la tendance", value=True)
+            st.session_state.app_state['analyzer'].model_components['seasonality'] = st.checkbox("Inclure la saisonnalité", value=True)
             
-            st.session_state.analyzer.model_params['future_periods'] = st.slider("Nombre de jours à prédire", 
+            st.session_state.app_state['analyzer'].model_params['future_periods'] = st.slider("Nombre de jours à prédire", 
                                                                 min_value=10, max_value=1000, 
-                                                                value=st.session_state.analyzer.model_params['future_periods'])
-            st.session_state.analyzer.model_params['epochs'] = st.slider("Nombre d'époques", 
+                                                                value=st.session_state.app_state['analyzer'].model_params['future_periods'])
+            st.session_state.app_state['analyzer'].model_params['epochs'] = st.slider("Nombre d'époques", 
                                                         min_value=10, max_value=300, 
-                                                        value=st.session_state.analyzer.model_params['epochs'])
+                                                        value=st.session_state.app_state['analyzer'].model_params['epochs'])
 
             if st.button("Entraîner le modèle et faire des prédictions"):
                 with st.spinner("Entraînement du modèle en cours..."):
-                    metrics = st.session_state.analyzer.train_model()
-                st.session_state.model_trained = True
+                    st.session_state.app_state['analyzer'].train_model()
+                st.session_state.app_state['model_trained'] = True
                 st.success("Modèle entraîné et prédictions générées avec succès!")
             
-        if st.session_state.model_trained:
-            try:
-                st.plotly_chart(st.session_state.analyzer.plot_forecast())
-                st.plotly_chart(st.session_state.analyzer.plot_holiday_impact())
-                st.plotly_chart(st.session_state.analyzer.plot_seasonal_trends())
-                st.plotly_chart(st.session_state.analyzer.plot_residuals())
-                mae, mse, r2 = st.session_state.analyzer.calculate_model_metrics()
-                st.subheader("Métriques de performance du modèle (sur les données d'entraînement)")
-                col1, col2, col3 = st.columns(3)
-                col1.metric("MAE", f"{mae:.2f}")
-                col2.metric("MSE", f"{mse:.2f}")
-                col3.metric("R²", f"{r2:.2f}")
-            except Exception as e:
-                st.error(f"Erreur lors de la création des graphiques : {str(e)}")
+        if st.session_state.app_state['model_trained']:
+            display_model_results()
+
+            st.subheader("Estimation de la taille de la flotte")
+            st.session_state.app_state['cost_option'], st.session_state.app_state['cost_params'] = get_cost_options()
+
+            if st.button("Estimer la taille de la flotte"):
+                estimate_fleet_size()
+
+        if st.session_state.app_state['fleet_estimated']:
+            display_fleet_estimation()
+    else:
+        initialize_session_state()
+
+def display_data_analysis():
+    st.subheader("Aperçu des données")
+    st.write(st.session_state.app_state['analyzer'].df.head())
+    st.write(f"Nombre total d'enregistrements: {len(st.session_state.app_state['analyzer'].df)}")
+    st.write(f"Période couverte: du {st.session_state.app_state['analyzer'].df['ds'].min()} au {st.session_state.app_state['analyzer'].df['ds'].max()}")
+    
+    st.plotly_chart(st.session_state.app_state['analyzer'].plot_input_data())
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.plotly_chart(st.session_state.app_state['analyzer'].plot_average_by_weekday())
+    with col2:
+        st.plotly_chart(st.session_state.app_state['analyzer'].plot_monthly_evolution())
+
+def display_model_results():
+    try:
+        st.plotly_chart(st.session_state.app_state['analyzer'].plot_forecast())
+        st.plotly_chart(st.session_state.app_state['analyzer'].plot_holiday_impact())
+        st.plotly_chart(st.session_state.app_state['analyzer'].plot_seasonal_trends())
+        st.plotly_chart(st.session_state.app_state['analyzer'].plot_residuals())
+        mae, mse, r2 = st.session_state.app_state['analyzer'].calculate_model_metrics()
+        st.subheader("Métriques de performance du modèle (sur les données d'entraînement)")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("MAE", f"{mae:.2f}")
+        col2.metric("MSE", f"{mse:.2f}")
+        col3.metric("R²", f"{r2:.2f}")
+    except Exception as e:
+        st.error(f"Erreur lors de la création des graphiques : {str(e)}")
+
+def estimate_fleet_size():
+    with st.spinner("Estimation de la taille de la flotte en cours..."):
+        true_data = st.session_state.app_state['analyzer'].df
+        predictions = st.session_state.app_state['analyzer'].forecast
+        
+        st.session_state.app_state['fleet_estimator'] = FleetEstimator(
+            true_data, 
+            predictions, 
+            st.session_state.app_state['cost_option'], 
+            st.session_state.app_state['cost_params']
+        )
+        st.session_state.app_state['fleet_size'] = st.session_state.app_state['fleet_estimator'].estimate_fleet_size()
+        st.session_state.app_state['fleet_estimated'] = True
+
+def display_fleet_estimation():
+    st.session_state.app_state['fleet_estimator'].display_results()
 
 if __name__ == "__main__":
     main_excel()
