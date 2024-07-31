@@ -180,9 +180,8 @@ def main():
             get_excel_inputs()
         
         if st.session_state.mu_client is None or st.session_state.sigma_client is None:
-            st.warning("Veuillez entrer les paramètres manuellement")
-            st.session_state.mu_client = st.number_input("Moyenne du nombre d'expédition par jour (entrepôt)", value=st.session_state.get('mu_client', 1000.0))
-            st.session_state.sigma_client = st.number_input("Ecart-type du nombre d'expédition par jour (entrepôt)", value=st.session_state.get('sigma_client', 100.0))
+            st.session_state.mu_client = st.number_input("Moyenne du nombre d'expédition par jour (entrepôt)", value=1000.0)
+            st.session_state.sigma_client = st.number_input("Ecart-type du nombre d'expédition par jour (entrepôt)", value=100.0)
         
         
         mu_reverse = st.number_input("Moyenne du délai de restitution (disponibilité de l'emballage)", value=4.0)

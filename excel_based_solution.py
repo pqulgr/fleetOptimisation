@@ -143,6 +143,7 @@ def estimate_fleet_size():
         st.session_state.app_state['fleet_size'] = st.session_state.app_state['fleet_estimator'].estimate_fleet_size()
         st.session_state.app_state['fleet_estimated'] = True
 
+@st.cache_resource
 def display_fleet_estimation():
     st.session_state.app_state['fleet_estimator'].display_results()
 
