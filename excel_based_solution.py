@@ -98,6 +98,7 @@ def main_excel():
     else:
         initialize_session_state()
 
+@st.cache_resource
 def display_data_analysis():
     st.subheader("Aperçu des données")
     st.write(st.session_state.app_state['analyzer'].df.head())
@@ -112,6 +113,7 @@ def display_data_analysis():
     with col2:
         st.plotly_chart(st.session_state.app_state['analyzer'].plot_monthly_evolution())
 
+@st.cache_resource
 def display_model_results():
     try:
         st.plotly_chart(st.session_state.app_state['analyzer'].plot_forecast())

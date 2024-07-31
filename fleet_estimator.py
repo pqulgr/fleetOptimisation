@@ -39,7 +39,7 @@ class FleetEstimator:
                 stock, pending_returns = self._calculate_stock(n_days, demand, reverse_time)
                 fleet_size = int(np.ceil(np.max(np.abs(stock))))
                 cost = self._calculate_total_cost(fleet_size, pending_returns, demand, reverse_time)
-                self.results[reverse_time] = {'fleet_size': fleet_size, 'cost': cost, 'stock': stock, 'pending_returns': pending_returns}
+                self.results[reverse_time] = {'fleet_size': fleet_size, 'cost': cost, 'stock': stock, 'pending_returns': pending_returns, 'max_in_stockage':np.abs(stock.min())}
                 if cost < best_cost:
                     best_cost = cost
                     self.best_reverse_time = reverse_time
@@ -53,7 +53,7 @@ class FleetEstimator:
             stock, pending_returns = self._calculate_stock(n_days, demand, reverse_time)
             self.fleet_size = int(np.ceil(np.max(np.abs(stock))))
             cost = self._calculate_total_cost(self.fleet_size, pending_returns, demand, reverse_time)
-            self.results[reverse_time] = {'fleet_size': self.fleet_size, 'cost': cost, 'stock': stock, 'pending_returns': pending_returns}
+            self.results[reverse_time] = {'fleet_size': self.fleet_size, 'cost': cost, 'stock': stock, 'pending_returns': pending_returns, 'max_in_stockage':np.abs(stock.min())}
             self.best_reverse_time = reverse_time
 
             self.combined_data['stock'] = stock
@@ -78,7 +78,7 @@ class FleetEstimator:
             if day > 0:
                 stock[day] = stock[day-1] + pending_returns[day] - demand[day]
 
-        return stock, pending_returns
+        return -stock, pending_returns
 
     def _calculate_total_cost(self, fleet_size, pending_returns, demand, reverse_time):
         if self.cost_option == "Option 1":
@@ -143,3 +143,4 @@ class FleetEstimator:
         st.markdown(f"**Meilleur délai de retour:** {self.best_reverse_time} jours")
         st.markdown(f"**Nombre d'emballages estimé:** {self.fleet_size}")
         st.markdown(f"**Coût estimé:** {self.results[self.best_reverse_time]['cost']:.0f}€")
+        st.markdown(f"**Maximum de sacs stocké en entrepôt:** {self.results[self.best_reverse_time]['max_in_stockage']:.0f} Sacs")

@@ -311,6 +311,52 @@ def create_summary_table(reverse_range, y, seuil_x):
     st.markdown(f"**Nombre d'emballages:** {optimal_emballages}")
     st.markdown(f"**Coût moyen minimal:** {min_cost}€")
 
+def run_simulation(n_simulations, n_jours, params_client, params_reverse, cost_option, cost_params, seuil_confiance, reverse_time):
+    if cost_option == "Option 1":
+        y = []
+        seuil_x_values = []
+        reverse_range = range(reverse_time[0], reverse_time[1]+1)
+        for i in reverse_range:
+            results, resultats_3_simulations, demand_scenarios, returns_scenarios, return_probs, shipping_demands, costs = simulate_(
+                n_simulations, n_jours, params_client, params_reverse, i, cost_option, cost_params)
+            
+            st.markdown(f"## Reverse définie à {i} jours")
+            seuil_x = plot_cdf(results, seuil_confiance)
+            seuil_x_values.append(seuil_x)
+            y.append((seuil_x, costs.get(str(seuil_x))))
+        
+        costs_per_reverse = specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags(
+            y, cost_params, 400, params_reverse, params_client, n_jours, cost_option
+        )
+        plot_cost_vs_reverse(costs_per_reverse)
+        plot_reverse_optimal_fleet(reverse_range, seuil_x_values)
+        create_summary_table(reverse_range, costs_per_reverse, seuil_x_values)
+
+    elif cost_option == "Option 2":
+        results, resultats_3_simulations, demand_scenarios, returns_scenarios, return_probs, shipping_demands, costs = simulate_(
+            n_simulations, n_jours, params_client, params_reverse, reverse_time, cost_option, cost_params)
+        
+        seuil_x = plot_cdf(results, seuil_confiance)
+        plot_3_scenarios(resultats_3_simulations, demand_scenarios, returns_scenarios)
+
+        rever = int(reverse_time)
+        y = np.array([(seuil_x, costs.get(str(seuil_x)))])
+        costs_per_reverse = specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags(
+            y, cost_params, 400, params_reverse, params_client, n_jours, cost_option
+        )
+
+        plot_cost_vs_reverse(costs_per_reverse)
+        create_summary_table([rever], costs_per_reverse, [seuil_x])
+
+    else:
+        results, resultats_3_simulations, demand_scenarios, returns_scenarios, return_probs, shipping_demands, _ = simulate_(
+            n_simulations, n_jours, params_client, params_reverse, reverse_time, cost_option, cost_params)
+        
+        plot_cdf(results, seuil_confiance)
+        plot_3_scenarios(resultats_3_simulations, demand_scenarios, returns_scenarios)
+        plot_return_probs(return_probs, params_reverse)
+        plot_shipping_demands(shipping_demands, params_client)
+
 def specific_fonction_for_accurately_determine_the_cost_of_the_recommended_number_of_bags(y, cost_params, n_sim, params_reverse, params_client, n_days_sim, cost_option):
     costs_per_reverse = []
     
