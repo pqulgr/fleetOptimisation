@@ -22,7 +22,15 @@ def get_cost_options():
     cost_option = st.selectbox("Sélectionnez une option de coût", ("Coût basé sur les points de collecte", "Coût basé sur le poids"))
     cost_option = "Option 1" if cost_option=="Coût basé sur les points de collecte" else "Option 2"
     if cost_option == "Option 1":
-        cost_params["reverse_time"] = st.slider("Délai avant reverse (jours)", min_value=1, max_value=20, value=(1,3), step=1)
+        st.write("Délai avant reverse (jours)")
+        col1, col2 = st.columns(2)
+        with col1:
+            min_reverse_time = st.number_input("Min", min_value=1, max_value=20, value=1, step=1)
+        with col2:
+            max_reverse_time = st.number_input("Max", min_value=1, max_value=20, value=3, step=1)
+        if min_reverse_time > max_reverse_time:
+            min_reverse_time, max_reverse_time = max_reverse_time, min_reverse_time
+        cost_params["reverse_time"] = (min_reverse_time,max_reverse_time)
         cost_params["nb_locations"] = st.number_input("Nombre de destinations", min_value=1, step=1, value=1)
         cost_params["cost_emballage"] = st.number_input("Coût d'achat des emballages", min_value=0.0, step=0.01, value=2.0)
         cost_params["cost_location"] = st.number_input("Coût de récupération à un point relai", min_value=0.0, step=0.1, value=5.0)
