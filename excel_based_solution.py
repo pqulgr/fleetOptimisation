@@ -16,21 +16,6 @@ def initialize_session_state():
             'cost_params': None
         }
 
-def get_event_features(analyzer):
-    st.subheader("Ajouter des event features")
-    
-    use_country_holidays = st.checkbox("Utiliser les jours fériés français", value=True)
-    
-    use_custom_events = st.checkbox("Ajouter des événements personnalisés depuis le fichier")
-    custom_events = []
-    if use_custom_events and analyzer.df_original is not None:
-        event_columns = [col for col in analyzer.df.columns if col not in ['ds', 'y']]
-        if event_columns:
-            custom_events = st.multiselect("Sélectionnez les colonnes d'événements", event_columns)
-        else:
-            st.warning("Aucune colonne d'événement supplémentaire n'a été trouvée dans le fichier.")
-
-    return use_country_holidays, custom_events
 
 def get_cost_options():
     cost_params = {}
@@ -79,7 +64,6 @@ def main_excel():
             sheet_names = xls.sheet_names
             selected_sheet = st.selectbox("Choisissez une feuille (optionnel)", ["Première feuille"] + sheet_names)
             sheet_name = None if selected_sheet == "Première feuille" else selected_sheet
-        
         if st.button("Charger les données"):
             if st.session_state.app_state['analyzer'].load_data(uploaded_file, date_column, colis_column, sheet_name):
                 st.session_state.app_state['data_loaded'] = True
@@ -92,7 +76,7 @@ def main_excel():
             
             st.subheader("Configuration du modèle NeuralProphet")
             st.session_state.app_state['analyzer'].model_components['trend'] = st.checkbox("Inclure la tendance", value=True)
-            st.session_state.app_state['analyzer'].model_components['seasonality'] = st.checkbox("Inclure la saisonnalité", value=True)
+            #st.session_state.app_state['analyzer'].model_components['seasonality'] = st.checkbox("Inclure la saisonnalité", value=True)
             st.session_state.app_state['analyzer'].model_components['artificial_noise'] = st.checkbox("Inclure du bruit", value=True)
 
             st.session_state.app_state['analyzer'].model_params['future_periods'] = st.slider("Nombre de jours à prédire", 
@@ -101,12 +85,16 @@ def main_excel():
             st.session_state.app_state['analyzer'].model_params['epochs'] = st.slider("Nombre d'époques", 
                                                         min_value=10, max_value=300, 
                                                         value=st.session_state.app_state['analyzer'].model_params['epochs'])
+            
+            st.session_state.app_state['analyzer'].use_country_holidays, 
+            st.session_state.app_state['analyzer'].custom_events,
+            st.session_state.app_state['analyzer'].use_week_day = st.session_state.app_state['analyzer'].get_event_features(date_column, colis_column)
 
-            use_country_holidays, custom_events = get_event_features(st.session_state.app_state['analyzer'])
+
 
             if st.button("Entraîner le modèle et faire des prédictions"):
                 with st.spinner("Entraînement du modèle en cours..."):
-                    st.session_state.app_state['analyzer'].train_model(use_country_holidays, custom_events)
+                    st.session_state.app_state['analyzer'].train_model(date_column)
                 st.session_state.app_state['model_trained'] = True
                 st.success("Modèle entraîné et prédictions générées avec succès!")
             
@@ -126,7 +114,7 @@ def main_excel():
 
 def display_data_analysis():
     st.subheader("Aperçu des données")
-    st.write(st.session_state.app_state['analyzer'].df.head())
+    st.write(st.session_state.app_state['analyzer'].df_original.head())
     st.write(f"Nombre total d'enregistrements: {len(st.session_state.app_state['analyzer'].df)}")
     st.write(f"Période couverte: du {st.session_state.app_state['analyzer'].df['ds'].min()} au {st.session_state.app_state['analyzer'].df['ds'].max()}")
     

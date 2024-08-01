@@ -14,6 +14,8 @@ class ExportAnalyzer:
         self.forecast = None
         self.train_predictions = None
         self.custom_events = []
+        self.use_country_holidays = False
+        self.use_week_day = False
         self.df_original = None 
         self.data_loaded = False
         self.model_trained = False
@@ -27,6 +29,23 @@ class ExportAnalyzer:
             'auto_regression': False,
             'artificial_noise':False
         }
+
+    def get_event_features(self, date_column, colis_column):
+        st.subheader("Ajouter des event features")
+        
+        use_country_holidays = st.checkbox("Utiliser les jours fériés français", value=True)
+        use_week_day = st.checkbox("Utiliser les jours de week-end en marquage", value=False)
+
+        use_custom_events = st.checkbox("Ajouter des événements personnalisés depuis le fichier")
+        custom_events = []
+        if use_custom_events and self.df_original is not None:
+            event_columns = [col for col in self.df_original.columns if col not in [date_column, colis_column]]
+            if event_columns:
+                custom_events = st.multiselect("Sélectionnez les colonnes d'événements", event_columns)
+            else:
+                st.warning("Aucune colonne d'événement supplémentaire n'a été trouvée dans le fichier.")
+
+        return use_country_holidays, custom_events, use_week_day
 
     def load_data(self, uploaded_file, date_column, colis_column, sheet_name=None):
         try:
@@ -51,7 +70,7 @@ class ExportAnalyzer:
             self.df_original = df.copy()
             
             # Créer un DataFrame spécifique pour NeuralProphet avec seulement les colonnes nécessaires
-            self.df = df.rename(columns={date_column: "ds", colis_column: "y"})[["ds", "y"]].copy()
+            self.df = df.rename(columns={date_column: "ds", colis_column: "y"})[["ds", "y"] + self.custom_events].copy()
             
             self.data_loaded = True
             self.model_trained = False
@@ -109,7 +128,7 @@ class ExportAnalyzer:
         
         return noisy_predictions
 
-    def train_model(self, use_country_holidays, custom_events):
+    def train_model(self, date_column):
         growth = "linear" if self.model_components['trend'] else "off"
         
         self.model = NeuralProphet(
@@ -124,13 +143,15 @@ class ExportAnalyzer:
         # Créer un nouveau DataFrame avec seulement les colonnes nécessaires
         df_train = self.df[['ds', 'y']].copy()
 
-        if use_country_holidays:
+        if self.use_country_holidays:
             self.model = self.model.add_country_holidays("FR")
 
-        for event in custom_events:
+        if self.use_week_day:
+            self.df['jour_semaine'] = self.df["ds"].dt.dayofweek.apply(lambda x:(x+1)%7==0).astype(int)
+
+        for event in self.custom_events:
             if event in self.df_original.columns:
                 self.model = self.model.add_events([event])
-                self.custom_events.append(event)
                 # Ajouter la colonne d'événement au DataFrame d'entraînement
                 df_train[event] = self.df_original[event]
 
