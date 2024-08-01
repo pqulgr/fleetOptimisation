@@ -174,12 +174,14 @@ def main():
         
         n_jours = st.number_input("Nombre de jours pour la simulation", min_value=1, max_value=100000, step=1, value=30)
         n_simulations = st.number_input("Nombre de simulations", min_value=1, max_value=100000, step=1, value=400)
-        seuil_confiance = st.number_input("Seuil de confiance (en %)", min_value=0.0, max_value=100.0, value=95.0) / 100.0
+        seuil_confiance = st.number_input("Seuil de confiance (en %)", min_value=0.0, max_value=100.0, value=99.0) / 100.0
         
         if use_file:
             get_excel_inputs()
+            st.session_state.mu_client = st.number_input("Moyenne du nombre d'expédition par jour (entrepôt)", value=st.session_state.get("mu_client",1000.))
+            st.session_state.sigma_client = st.number_input("Ecart-type du nombre d'expédition par jour (entrepôt)", value=st.session_state.get("sigma_client",100.))
         
-        if st.session_state.mu_client is None or st.session_state.sigma_client is None:
+        else:#if st.session_state.mu_client is None or st.session_state.sigma_client is None:
             st.session_state.mu_client = st.number_input("Moyenne du nombre d'expédition par jour (entrepôt)", value=1000.0)
             st.session_state.sigma_client = st.number_input("Ecart-type du nombre d'expédition par jour (entrepôt)", value=100.0)
         

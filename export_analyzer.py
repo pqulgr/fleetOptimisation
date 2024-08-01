@@ -13,6 +13,8 @@ class ExportAnalyzer:
         self.model = None
         self.forecast = None
         self.train_predictions = None
+        self.custom_events = []
+        self.df_original = None 
         self.data_loaded = False
         self.model_trained = False
         self.model_params = {
@@ -46,7 +48,11 @@ class ExportAnalyzer:
             
             df[date_column] = pd.to_datetime(df[date_column])
             df[colis_column] = df[colis_column].fillna(0).astype(int)
-            self.df = df.rename(columns={date_column: "ds", colis_column: "y"})[["ds","y"]].copy()
+            self.df_original = df.copy()
+            
+            # Créer un DataFrame spécifique pour NeuralProphet avec seulement les colonnes nécessaires
+            self.df = df.rename(columns={date_column: "ds", colis_column: "y"})[["ds", "y"]].copy()
+            
             self.data_loaded = True
             self.model_trained = False
             return True
@@ -103,7 +109,7 @@ class ExportAnalyzer:
         
         return noisy_predictions
 
-    def train_model(self):
+    def train_model(self, use_country_holidays, custom_events):
         growth = "linear" if self.model_components['trend'] else "off"
         
         self.model = NeuralProphet(
@@ -114,13 +120,30 @@ class ExportAnalyzer:
             n_forecasts=1,
             epochs=self.model_params['epochs']
         )
-        self.model = self.model.add_country_holidays("FR")
-        metrics = self.model.fit(self.df, freq="D")
+
+        # Créer un nouveau DataFrame avec seulement les colonnes nécessaires
+        df_train = self.df[['ds', 'y']].copy()
+
+        if use_country_holidays:
+            self.model = self.model.add_country_holidays("FR")
+
+        for event in custom_events:
+            if event in self.df_original.columns:
+                self.model = self.model.add_events([event])
+                self.custom_events.append(event)
+                # Ajouter la colonne d'événement au DataFrame d'entraînement
+                df_train[event] = self.df_original[event]
+
+        metrics = self.model.fit(df_train, freq="D")
         
-        self.train_predictions = self.model.predict(self.df)
+        self.train_predictions = self.model.predict(df_train)
         
-        future = self.model.make_future_dataframe(self.df, 
+        future = self.model.make_future_dataframe(df_train, 
                                                   periods=self.model_params['future_periods'])
+        # Ajouter les colonnes d'événements au DataFrame futur
+        for event in self.custom_events:
+            future[event] = 0  # Initialiser à 0, vous pouvez ajuster cela selon vos besoins
+        
         self.forecast = self.model.predict(future)
         y_pred_future = 'yhat1' if 'yhat1' in self.forecast.columns else 'yhat'
         if self.model_components['artificial_noise']:
@@ -129,6 +152,24 @@ class ExportAnalyzer:
         
         self.model_trained = True
         return metrics
+
+    def plot_holiday_impact(self):
+        holidays = ['Armistice', 'Ascension', 'Assomption', 'Fête de la Victoire', 'Fête du Travail', 
+                    'Fête nationale', "Jour de l'an", 'Lundi de Pentecôte', 'Lundi de Pâques', 
+                    'Noël', 'Toussaint'] + self.custom_events
+        
+        holiday_impact = self.forecast[['ds'] + [f'event_{h}' for h in holidays if f'event_{h}' in self.forecast.columns]].melt(
+            id_vars=['ds'], 
+            var_name='holiday', 
+            value_name='impact'
+        )
+        holiday_impact['holiday'] = holiday_impact['holiday'].str.replace('event_', '')
+        
+        fig = px.box(holiday_impact, x='holiday', y='impact', 
+                     title="Impact des jours fériés et événements sur la demande",
+                     labels={'holiday': 'Jour férié / Événement', 'impact': 'Impact sur la demande'})
+        fig.update_xaxes(tickangle=45)
+        return fig
 
     def plot_forecast(self):
         fig = go.Figure()
@@ -146,21 +187,6 @@ class ExportAnalyzer:
         fig.update_layout(title="Prédictions vs Réalité", xaxis_title="Date", yaxis_title="Exportations")
         return fig
 
-    def plot_holiday_impact(self):
-        holidays = ['Armistice', 'Ascension', 'Assomption', 'Fête de la Victoire', 'Fête du Travail', 
-                    'Fête nationale', "Jour de l'an", 'Lundi de Pentecôte', 'Lundi de Pâques', 
-                    'Noël', 'Toussaint']
-        
-        holiday_impact = self.forecast[['ds'] + [f'event_{h}' for h in holidays]].melt(id_vars=['ds'], 
-                                                                                  var_name='holiday', 
-                                                                                  value_name='impact')
-        holiday_impact['holiday'] = holiday_impact['holiday'].str.replace('event_', '')
-        
-        fig = px.box(holiday_impact, x='holiday', y='impact', 
-                     title="Impact des jours fériés sur la demande",
-                     labels={'holiday': 'Jour férié', 'impact': 'Impact sur la demande'})
-        fig.update_xaxes(tickangle=45)
-        return fig
 
     def plot_seasonal_trends(self):
         fig = make_subplots(rows=2, cols=1, subplot_titles=("Tendance annuelle", "Tendance hebdomadaire"))

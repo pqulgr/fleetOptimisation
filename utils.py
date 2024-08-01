@@ -312,7 +312,7 @@ def create_summary_table(reverse_range, y, seuil_x):
     st.markdown(f"**Coût moyen minimal:** {min_cost}€")
 
 def run_simulation(n_simulations, n_jours, params_client, params_reverse, cost_option, cost_params, seuil_confiance, reverse_time):
-    if cost_option == "Option 1":
+    if cost_option == "Option 1":# option 1 alias couts par points de retour
         y = []
         seuil_x_values = []
         reverse_range = range(reverse_time[0], reverse_time[1]+1)

@@ -16,6 +16,22 @@ def initialize_session_state():
             'cost_params': None
         }
 
+def get_event_features(analyzer):
+    st.subheader("Ajouter des event features")
+    
+    use_country_holidays = st.checkbox("Utiliser les jours fériés français", value=True)
+    
+    use_custom_events = st.checkbox("Ajouter des événements personnalisés depuis le fichier")
+    custom_events = []
+    if use_custom_events and analyzer.df_original is not None:
+        event_columns = [col for col in analyzer.df.columns if col not in ['ds', 'y']]
+        if event_columns:
+            custom_events = st.multiselect("Sélectionnez les colonnes d'événements", event_columns)
+        else:
+            st.warning("Aucune colonne d'événement supplémentaire n'a été trouvée dans le fichier.")
+
+    return use_country_holidays, custom_events
+
 def get_cost_options():
     cost_params = {}
     cost_option = None
@@ -86,9 +102,11 @@ def main_excel():
                                                         min_value=10, max_value=300, 
                                                         value=st.session_state.app_state['analyzer'].model_params['epochs'])
 
+            use_country_holidays, custom_events = get_event_features(st.session_state.app_state['analyzer'])
+
             if st.button("Entraîner le modèle et faire des prédictions"):
                 with st.spinner("Entraînement du modèle en cours..."):
-                    st.session_state.app_state['analyzer'].train_model()
+                    st.session_state.app_state['analyzer'].train_model(use_country_holidays, custom_events)
                 st.session_state.app_state['model_trained'] = True
                 st.success("Modèle entraîné et prédictions générées avec succès!")
             
