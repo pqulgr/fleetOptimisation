@@ -86,15 +86,13 @@ def main_excel():
                                                         min_value=10, max_value=300, 
                                                         value=st.session_state.app_state['analyzer'].model_params['epochs'])
             
-            st.session_state.app_state['analyzer'].use_country_holidays, 
-            st.session_state.app_state['analyzer'].custom_events,
-            st.session_state.app_state['analyzer'].use_week_day = st.session_state.app_state['analyzer'].get_event_features(date_column, colis_column)
+            st.session_state.app_state['analyzer'].use_country_holidays,st.session_state.app_state['analyzer'].custom_events = st.session_state.app_state['analyzer'].get_event_features(date_column, colis_column)
 
 
 
             if st.button("Entraîner le modèle et faire des prédictions"):
                 with st.spinner("Entraînement du modèle en cours..."):
-                    st.session_state.app_state['analyzer'].train_model(date_column)
+                    st.session_state.app_state['analyzer'].train_model()
                 st.session_state.app_state['model_trained'] = True
                 st.success("Modèle entraîné et prédictions générées avec succès!")
             

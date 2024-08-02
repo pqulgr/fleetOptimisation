@@ -15,7 +15,6 @@ class ExportAnalyzer:
         self.train_predictions = None
         self.custom_events = []
         self.use_country_holidays = False
-        self.use_week_day = False
         self.df_original = None 
         self.data_loaded = False
         self.model_trained = False
@@ -34,7 +33,6 @@ class ExportAnalyzer:
         st.subheader("Ajouter des event features")
         
         use_country_holidays = st.checkbox("Utiliser les jours fériés français", value=True)
-        use_week_day = st.checkbox("Utiliser les jours de week-end en marquage", value=False)
 
         use_custom_events = st.checkbox("Ajouter des événements personnalisés depuis le fichier")
         custom_events = []
@@ -45,7 +43,7 @@ class ExportAnalyzer:
             else:
                 st.warning("Aucune colonne d'événement supplémentaire n'a été trouvée dans le fichier.")
 
-        return use_country_holidays, custom_events, use_week_day
+        return use_country_holidays, custom_events
 
     def load_data(self, uploaded_file, date_column, colis_column, sheet_name=None):
         try:
@@ -128,7 +126,7 @@ class ExportAnalyzer:
         
         return noisy_predictions
 
-    def train_model(self, date_column):
+    def train_model(self):
         growth = "linear" if self.model_components['trend'] else "off"
         
         self.model = NeuralProphet(
@@ -145,9 +143,6 @@ class ExportAnalyzer:
 
         if self.use_country_holidays:
             self.model = self.model.add_country_holidays("FR")
-
-        if self.use_week_day:
-            self.df['jour_semaine'] = self.df["ds"].dt.dayofweek.apply(lambda x:(x+1)%7==0).astype(int)
 
         for event in self.custom_events:
             if event in self.df_original.columns:
@@ -175,21 +170,36 @@ class ExportAnalyzer:
         return metrics
 
     def plot_holiday_impact(self):
-        holidays = ['Armistice', 'Ascension', 'Assomption', 'Fête de la Victoire', 'Fête du Travail', 
-                    'Fête nationale', "Jour de l'an", 'Lundi de Pentecôte', 'Lundi de Pâques', 
-                    'Noël', 'Toussaint'] + self.custom_events
+        # Liste des jours fériés français
+        french_holidays = [
+            'Armistice', 'Ascension', 'Assomption', 'Fête de la Victoire', 'Fête du Travail',
+            'Fête nationale', "Jour de l'an", 'Lundi de Pentecôte', 'Lundi de Pâques',
+            'Noël', 'Toussaint'
+        ]
         
-        holiday_impact = self.forecast[['ds'] + [f'event_{h}' for h in holidays if f'event_{h}' in self.forecast.columns]].melt(
-            id_vars=['ds'], 
-            var_name='holiday', 
+        # Combiner les jours fériés français et les événements personnalisés
+        all_events = french_holidays + self.custom_events
+        
+        # Filtrer pour n'inclure que les événements présents dans les prédictions
+        events_in_forecast = [h for h in all_events if f'event_{h}' in self.forecast.columns]
+        
+        
+        # Créer le DataFrame d'impact des événements
+        holiday_impact = self.forecast[['ds'] + [f'event_{h}' for h in events_in_forecast]].melt(
+            id_vars=['ds'],
+            var_name='holiday',
             value_name='impact'
         )
         holiday_impact['holiday'] = holiday_impact['holiday'].str.replace('event_', '')
         
-        fig = px.box(holiday_impact, x='holiday', y='impact', 
-                     title="Impact des jours fériés et événements sur la demande",
-                     labels={'holiday': 'Jour férié / Événement', 'impact': 'Impact sur la demande'})
+        # Créer le graphique
+        fig = px.box(holiday_impact, x='holiday', y='impact',
+                    title="Impact des jours fériés et événements sur la demande",
+                    labels={'holiday': 'Jour férié / Événement', 'impact': 'Impact sur la demande'})
+        
         fig.update_xaxes(tickangle=45)
+        fig.update_layout(height=600)  # Ajuster la hauteur pour une meilleure lisibilité
+        
         return fig
 
     def plot_forecast(self):
