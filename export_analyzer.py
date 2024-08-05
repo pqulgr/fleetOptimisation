@@ -234,7 +234,6 @@ class ExportAnalyzer:
         return metrics
 
 
-
     def plot_residuals(self):
         residuals = self.df['y'] - self.train_predictions['yhat1']
         
@@ -384,7 +383,7 @@ class ExportAnalyzer:
         st.write(f"- Époques: {self.model_params['epochs']}")
         st.write(f"- Tendance: {'Activée' if self.model_components['trend'] else 'Désactivée'}")
         st.write(f"- Saisonnalité: {'Activée' if self.model_components['seasonality'] else 'Désactivée'}")
-        st.write(f"- Autorégression: {'Activée' if self.model_components['auto_regression'] else 'Désactivée'}")
+        #st.write(f"- Autorégression: {'Activée' if self.model_components['auto_regression'] else 'Désactivée'}")
         st.write(f"- Bruit artificiel: {'Activé' if self.model_components['artificial_noise'] else 'Désactivé'}")
         st.write(f"- Jours fériés français: {'Inclus' if self.use_country_holidays else 'Non inclus'}")
     

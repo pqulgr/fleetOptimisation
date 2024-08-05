@@ -37,7 +37,7 @@ class FleetEstimator:
             best_cost = float('inf')
             for reverse_time in reverse_range:
                 stock, pending_returns = self._calculate_stock(n_days, demand, reverse_time)
-                fleet_size = int(np.ceil(np.max(np.abs(stock))))
+                fleet_size = int(np.ceil(np.max(stock)))
                 cost = self._calculate_total_cost(fleet_size, pending_returns, demand, reverse_time)
                 self.results[reverse_time] = {'fleet_size': fleet_size, 'cost': cost, 'stock': stock, 'pending_returns': pending_returns, 'max_in_stockage':np.abs(stock.min())}
                 if cost < best_cost:
@@ -108,7 +108,8 @@ class FleetEstimator:
         data = self.results[reverse_time]
         fig = go.Figure()
 
-        fig.add_trace(go.Scatter(x=self.combined_data['ds'], y=data['stock'], mode='lines', name='Stock'))
+        # represente l'évolution du stock en fonction du temps
+        fig.add_trace(go.Scatter(x=self.combined_data['ds'], y=data['fleet_size'] - np.abs(data['stock']), mode='lines', name='Stock'))
         fig.add_trace(go.Scatter(x=self.combined_data['ds'], y=self.combined_data['demand'], mode='lines', name='Demande'))
         fig.add_trace(go.Scatter(x=self.combined_data['ds'], y=data['pending_returns'], mode='lines', name='Retours'))
 

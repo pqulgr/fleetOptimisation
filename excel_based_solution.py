@@ -3,6 +3,119 @@ import pandas as pd
 from export_analyzer import ExportAnalyzer
 from fleet_estimator import FleetEstimator
 
+import io
+from openpyxl import Workbook
+from openpyxl.drawing.image import Image
+from openpyxl.utils.dataframe import dataframe_to_rows
+from openpyxl.chart import LineChart, Reference
+from openpyxl.styles import Font, Alignment
+
+
+def export_results_to_excel(analyzer, fleet_estimator):
+    output = io.BytesIO()
+    workbook = Workbook()
+    
+    # Feuille pour les données brutes et les prédictions
+    ws_data = workbook.active
+    ws_data.title = "Données et Prédictions"
+    
+    # Combiner les données brutes et les prédictions
+    df_real = analyzer.df.rename(columns={'y': 'y_real'})
+    df_pred = analyzer.forecast.rename(columns={'yhat1': 'y_pred'})
+    combined_data = pd.merge(df_real, df_pred[['ds', 'y_pred']], on='ds', how='outer')
+    combined_data = combined_data.sort_values('ds')
+    
+    for r in dataframe_to_rows(combined_data, index=False, header=True):
+        ws_data.append(r)
+    
+    # Ajout d'un graphique pour les données réelles et les prédictions
+    chart = LineChart()
+    chart.title = "Données réelles vs Prédictions"
+    chart.y_axis.title = "Nombre de colis"
+    chart.x_axis.title = "Date"
+    
+    # Données réelles
+    y_col_real = ws_data['B']  # Colonne 'y_real' (données réelles)
+    data_real = Reference(ws_data, min_col=2, min_row=1, max_row=len(y_col_real))
+    chart.add_data(data_real, titles_from_data=True)
+    
+    # Prédictions
+    y_col_pred = ws_data['C']  # Colonne 'y_pred' (prédictions)
+    data_pred = Reference(ws_data, min_col=3, min_row=1, max_row=len(y_col_pred))
+    chart.add_data(data_pred, titles_from_data=True)
+    
+    dates = Reference(ws_data, min_col=1, min_row=2, max_row=len(combined_data)+1)
+    chart.set_categories(dates)
+    
+    ws_data.add_chart(chart, "E2")
+    
+    # Feuille pour les métriques du modèle
+    ws_metrics = workbook.create_sheet("Métriques du modèle")
+    metrics = analyzer.calculate_model_metrics()
+    ws_metrics.append(["Métrique", "Valeur"])
+    for key, value in metrics.items():
+        ws_metrics.append([key, value])
+    
+    # Mise en forme du tableau des métriques
+    for cell in ws_metrics["A"] + ws_metrics[1]:
+        cell.font = Font(bold=True)
+    
+    # Feuille pour l'estimation de la flotte
+    ws_fleet = workbook.create_sheet("Estimation de la flotte")
+    summary_table = fleet_estimator.create_summary_table()
+    for r in dataframe_to_rows(summary_table, index=False, header=True):
+        ws_fleet.append(r)
+    
+    ws_fleet.append([])
+    ws_fleet.append(["Meilleur délai de retour", fleet_estimator.best_reverse_time])
+    ws_fleet.append(["Nombre d'emballages estimé", fleet_estimator.fleet_size])
+    ws_fleet.append(["Coût estimé", f"{fleet_estimator.results[fleet_estimator.best_reverse_time]['cost']:.0f}€"])
+    ws_fleet.append(["Maximum de sacs stocké en entrepôt", f"{fleet_estimator.results[fleet_estimator.best_reverse_time]['max_in_stockage']:.0f} Sacs"])
+    
+    # Mise en forme du tableau de la flotte
+    for cell in ws_fleet["A"] + ws_fleet[1]:
+        cell.font = Font(bold=True)
+    
+    # Feuille pour l'analyse des composantes
+    ws_components = workbook.create_sheet("Analyse des composantes")
+    components = analyzer.forecast[['ds', 'trend', 'season_yearly', 'season_weekly']]
+    for r in dataframe_to_rows(components, index=False, header=True):
+        ws_components.append(r)
+    
+    # Ajout d'un graphique pour les composantes
+    chart = LineChart()
+    chart.title = "Décomposition des composantes de la prédiction"
+    chart.y_axis.title = "Valeur"
+    chart.x_axis.title = "Date"
+    
+    for col in range(2, 5):
+        data = Reference(ws_components, min_col=col, min_row=1, max_row=len(components)+1)
+        chart.add_data(data, titles_from_data=True)
+    
+    dates = Reference(ws_components, min_col=1, min_row=2, max_row=len(components)+1)
+    chart.set_categories(dates)
+    
+    ws_components.add_chart(chart, "F2")
+    
+    # Ajustement de la largeur des colonnes
+    for ws in workbook.worksheets:
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(cell.value)
+                except:
+                    pass
+            adjusted_width = (max_length + 2)
+            ws.column_dimensions[column_letter].width = adjusted_width
+    
+    # Sauvegarde du fichier Excel
+    workbook.save(output)
+    output.seek(0)
+    
+    return output
 def initialize_session_state():
     if 'app_state' not in st.session_state:
         st.session_state.app_state = {
@@ -149,6 +262,14 @@ def main_excel():
 
         if st.session_state.app_state['fleet_estimated']:
             display_fleet_estimation()
+            #if st.button("Exporter les résultats en Excel"):
+            excel_file = export_results_to_excel(st.session_state.app_state['analyzer'], st.session_state.app_state['fleet_estimator'])
+            st.download_button(
+                label="Télécharger le fichier Excel",
+                data=excel_file,
+                file_name="resultats_analyse_prediction.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
     else:
         initialize_session_state()
 
