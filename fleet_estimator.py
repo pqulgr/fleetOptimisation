@@ -132,12 +132,35 @@ class FleetEstimator:
 
         df = pd.DataFrame(data)
         return df
+    
+    def plot_cost_for_each_reverse(self):
+        fig = go.Figure()
+        data = []
+        for reverse_time, result in self.results.items():
+            data.append({
+                'Délai de retour': reverse_time,
+                'Coût estimé': f"{result['cost']:.0f}"
+            })
+        df = pd.DataFrame(data)
+        fig.add_trace(go.Scatter(x=df['Délai de retour'], y=df['Coût estimé'], mode='lines', name='Evolution des coûts pour les différentes Reverse'))
+
+        fig.update_layout(
+            title=f'Évolution des coûts, en fonction des retours',
+            xaxis_title='Reverse',
+            yaxis_title='Coûts',
+            hovermode='x'
+        )
+        return fig
 
     def display_results(self):
         st.plotly_chart(self.plot_stock_over_time())
         
         st.markdown("## Tableau récapitulatif:")
-        st.dataframe(self.create_summary_table())
+        col1, col2 = st.columns(2)
+        with col1:
+            st.dataframe(self.create_summary_table())
+        with col2:
+            st.plotly_chart(self.plot_cost_for_each_reverse())
 
         st.markdown("## Résultat de l'estimation:")
         st.markdown(f"**Meilleur délai de retour:** {self.best_reverse_time} jours")
