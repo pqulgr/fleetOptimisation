@@ -26,7 +26,8 @@ class ExportAnalyzer:
             'trend': True,
             'seasonality': True,
             'auto_regression': False,
-            'artificial_noise':False
+            'artificial_noise':False,
+            'freq':'D'
         }
 
     def get_event_features(self):
@@ -96,12 +97,6 @@ class ExportAnalyzer:
         rmse = np.sqrt(mse)
         r2 = r2_score(y_true, y_pred)
         
-        # Erreur absolue moyenne en pourcentage (MAPE)
-        mape = mean_absolute_percentage_error(y_true, y_pred) * 100
-        
-        # Erreur moyenne en pourcentage symétrique (SMAPE)
-        smape = 100 * np.mean(2 * np.abs(y_pred - y_true) / (np.abs(y_true) + np.abs(y_pred)))
-        
         # Coefficient de Theil U
         y_true_shift = y_true[1:]
         y_true = y_true[:-1]
@@ -126,8 +121,6 @@ class ExportAnalyzer:
             'MSE': mse,
             'RMSE': rmse,
             'R²': r2,
-            'MAPE': mape,
-            'SMAPE': smape,
             'Theil U': theil_u,
             'Biais': bias,
             'Variance de l erreur': variance,
@@ -149,10 +142,8 @@ class ExportAnalyzer:
             st.metric("MSE (Erreur Quadratique Moyenne)", f"{metrics['MSE']:.2f}")
             st.metric("RMSE (Racine de l'Erreur Quadratique Moyenne)", f"{metrics['RMSE']:.2f}")
             st.metric("R² (Coefficient de détermination)", f"{metrics['R²']:.2f}")
-            st.metric("MAPE (Erreur Absolue Moyenne en Pourcentage)", f"{metrics['MAPE']:.2f}%")
         
         with col2:
-            st.metric("SMAPE (Erreur Moyenne en Pourcentage Symétrique)", f"{metrics['SMAPE']:.2f}%")
             st.metric("Coefficient de Theil U", f"{metrics['Theil U']:.2f}")
             st.metric("Biais", f"{metrics['Biais']:.2f}")
             st.metric("Variance de l'erreur", f"{metrics['Variance de l erreur']:.2f}")
@@ -163,7 +154,6 @@ class ExportAnalyzer:
         st.write("Interprétation des métriques :")
         st.write("- MAE, MSE, RMSE : Plus ces valeurs sont basses, meilleur est le modèle.")
         st.write("- R² : Plus proche de 1, meilleur est le modèle.")
-        st.write("- MAPE, SMAPE : Représentent l'erreur en pourcentage. Plus bas est meilleur.")
         st.write("- Theil U : Varie entre 0 et 1. Plus proche de 0, meilleur est le modèle.")
         st.write("- Statistique de Durbin-Watson : Proche de 2 indique une absence d'autocorrélation des résidus.")
         st.write("- Test de Shapiro-Wilk : Une p-value > 0.05 suggère que les résidus sont normalement distribués.")
@@ -187,14 +177,8 @@ class ExportAnalyzer:
         
         residuals = y_true - y_pred_train
         
-        # Calculer la moyenne et l'écart-type des résidus
-        #mean_residual = np.mean(residuals)
-        #std_residual = np.std(residuals)
-        
-        # Générer du bruit basé sur la distribution des résidus
         noise = np.random.choice(residuals, size=len(y_predictions))
         
-        # Ajouter le bruit aux prédictions futures
         noisy_predictions = np.array([y_predictions[i] + noise[i] if y_predictions[i]>0 else y_predictions[i] for i in range(len(noise))])
         
         return noisy_predictions
@@ -217,7 +201,7 @@ class ExportAnalyzer:
         if self.use_country_holidays:
             self.model = self.model.add_country_holidays("FR")
 
-        metrics = self.model.fit(df_train, freq="D")
+        metrics = self.model.fit(df_train, freq=self.model_components["freq"])
         
         self.train_predictions = self.model.predict(df_train)
         
@@ -383,6 +367,7 @@ class ExportAnalyzer:
         st.write(f"- Époques: {self.model_params['epochs']}")
         st.write(f"- Tendance: {'Activée' if self.model_components['trend'] else 'Désactivée'}")
         st.write(f"- Saisonnalité: {'Activée' if self.model_components['seasonality'] else 'Désactivée'}")
+        st.write(f"- Base temporelle: {'Jours' if self.model_components['freq']=='D' else 'Mois'}")
         #st.write(f"- Autorégression: {'Activée' if self.model_components['auto_regression'] else 'Désactivée'}")
         st.write(f"- Bruit artificiel: {'Activé' if self.model_components['artificial_noise'] else 'Désactivé'}")
         st.write(f"- Jours fériés français: {'Inclus' if self.use_country_holidays else 'Non inclus'}")

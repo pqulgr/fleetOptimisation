@@ -11,6 +11,8 @@ from openpyxl.chart import LineChart, Reference
 from openpyxl.styles import Font, Alignment
 
 
+OPTION_FREQ = ["Jours", "Mois"]
+
 def export_results_to_excel(analyzer, fleet_estimator):
     output = io.BytesIO()
     workbook = Workbook()
@@ -138,16 +140,16 @@ def get_cost_options():
         st.write("Délai avant reverse (jours)")
         col1, col2 = st.columns(2)
         with col1:
-            min_reverse_time = st.number_input("Min", min_value=1, max_value=20, value=1, step=1)
+            min_reverse_time = st.number_input("Min", min_value=1, max_value=400, value=7, step=1)
         with col2:
-            max_reverse_time = st.number_input("Max", min_value=1, max_value=20, value=3, step=1)
+            max_reverse_time = st.number_input("Max", min_value=1, max_value=400, value=20, step=1)
         if min_reverse_time > max_reverse_time:
             min_reverse_time, max_reverse_time = max_reverse_time, min_reverse_time
         cost_params["reverse_time"] = (min_reverse_time, max_reverse_time)
-        cost_params["nb_locations"] = st.number_input("Nombre de destinations", min_value=1, step=1, value=1)
-        cost_params["cost_emballage"] = st.number_input("Coût d'achat des emballages", min_value=0.0, step=0.01, value=2.0)
+        cost_params["nb_locations"] = st.number_input("Nombre de destinations", min_value=1, step=1, value=120)
+        cost_params["cost_emballage"] = st.number_input("Coût d'achat des emballages", min_value=0.0, step=0.01, value=3.5)
         cost_params["cost_location"] = st.number_input("Coût de récupération à un point relai", min_value=0.0, step=0.1, value=5.0)
-        cost_params["cost_per_demand"] = st.number_input("Coût par envoi", min_value=0.0, step=0.1, value=1.0)
+        cost_params["cost_per_demand"] = st.number_input("Coût par envoi", min_value=0.0, step=0.1, value=0.12)
     elif cost_option == "Option 2":
         cost_params["reverse_time"] = st.number_input("Délai avant reverse (jours)", min_value=1, step=1, value=3)
         cost_params["cost_emballage"] = st.number_input("Coût d'achat des emballages", min_value=0.0, step=0.01, value=2.0)
@@ -236,7 +238,20 @@ def main_excel():
             st.session_state.app_state['analyzer'].model_components['trend'] = st.checkbox("Inclure la tendance", value=True)
             st.session_state.app_state['analyzer'].model_components['artificial_noise'] = st.checkbox("Inclure du bruit", value=True)
 
-            st.session_state.app_state['analyzer'].model_params['future_periods'] = st.slider("Nombre de jours à prédire", 
+            #Frequence de la prédiction
+            col1, col2 = st.columns(2)
+            with col1:
+                st.session_state.app_state['analyzer'].model_components['freq'] = "D" if st.radio("Choisisez la période de prédiction", OPTION_FREQ)=="Jours" else "MS"
+            with col2:
+                if st.session_state.app_state['analyzer'].model_components['freq']=="D":
+                    st.write("Les prédictions se font par jours")
+                elif st.session_state.app_state['analyzer'].model_components['freq']=="MS":
+                    st.write("Les prédictions se font par mois")
+                else:
+                    st.error("probably my bad")
+
+
+            st.session_state.app_state['analyzer'].model_params['future_periods'] = st.slider("Nombre d'étapes futures à prédire", 
                                                                 min_value=10, max_value=1000, 
                                                                 value=st.session_state.app_state['analyzer'].model_params['future_periods'])
             st.session_state.app_state['analyzer'].model_params['epochs'] = st.slider("Nombre d'époques", 
