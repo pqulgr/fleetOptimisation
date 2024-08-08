@@ -14,8 +14,7 @@ OPTION_FREQ = {
     "Jours": "D",
     "Semaines": "W",
     "Mois": "MS",
-    "Trimestres": "QS",
-    "Années": "YS"
+    "Trimestres": "QS"
 }
 
 def export_results_to_excel(analyzer, fleet_estimator):
@@ -166,9 +165,9 @@ def get_cost_options():
 
 def display_data_analysis():
     st.subheader("Aperçu des données")
-    st.table(st.session_state.app_state['analyzer'].df_original.head(8))
+    st.table(st.session_state.app_state['analyzer'].df.head(8))
     st.write(f"Nombre total d'enregistrements: {len(st.session_state.app_state['analyzer'].df)}")
-    st.write(f"Période couverte: du {st.session_state.app_state['analyzer'].df['ds'].min()} au {st.session_state.app_state['analyzer'].df['ds'].max()}")
+    st.write(f"Période couverte: du {st.session_state.app_state['analyzer'].df['ds'].min().date()} au {st.session_state.app_state['analyzer'].df['ds'].max().date()}")
     
     st.plotly_chart(st.session_state.app_state['analyzer'].plot_input_data())
     

@@ -297,9 +297,7 @@ class ExportAnalyzer:
         # Erreur de prédiction
         error = self.df['y'] - self.train_predictions[y_pred_train]
         fig.add_trace(go.Scatter(x=self.df['ds'], y=error, mode='lines', name='Erreur de prédiction'),
-                      row=2, col=1)
-        fig.add_hline(y=0, line_dash="dash", line_color="red", row=2, col=1)
-        
+                      row=2, col=1)        
         fig.update_layout(height=800, title_text="Analyse des prédictions du modèle")
         fig.update_xaxes(title_text="Date", row=2, col=1)
         fig.update_yaxes(title_text="Exportations", row=1, col=1)
@@ -361,13 +359,19 @@ class ExportAnalyzer:
         return fig
 
     def display_model_summary(self):
+        INV_OPTION_FREQ = {
+            "D": "Jours",
+            "W": "Semaines",
+            "MS": "Mois",
+            "QS": "Trimestres"
+        }
         st.subheader("Résumé du modèle")
         st.write("Paramètres du modèle:")
         st.write(f"- Périodes futures: {self.model_params['future_periods']}")
         st.write(f"- Époques: {self.model_params['epochs']}")
         st.write(f"- Tendance: {'Activée' if self.model_components['trend'] else 'Désactivée'}")
         st.write(f"- Saisonnalité: {'Activée' if self.model_components['seasonality'] else 'Désactivée'}")
-        st.write(f"- Base temporelle: {'Jours' if self.model_components['freq']=='D' else 'Mois'}")
+        st.write(f"- Base temporelle: {INV_OPTION_FREQ[self.model_components['freq']]}")
         #st.write(f"- Autorégression: {'Activée' if self.model_components['auto_regression'] else 'Désactivée'}")
         st.write(f"- Bruit artificiel: {'Activé' if self.model_components['artificial_noise'] else 'Désactivé'}")
         st.write(f"- Jours fériés français: {'Inclus' if self.use_country_holidays else 'Non inclus'}")
