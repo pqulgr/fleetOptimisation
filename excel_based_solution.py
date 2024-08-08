@@ -5,13 +5,18 @@ from fleet_estimator import FleetEstimator
 
 import io
 from openpyxl import Workbook
-from openpyxl.drawing.image import Image
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.chart import LineChart, Reference
 from openpyxl.styles import Font, Alignment
 
 
-OPTION_FREQ = ["Jours", "Mois"]
+OPTION_FREQ = {
+    "Jours": "D",
+    "Semaines": "W",
+    "Mois": "MS",
+    "Trimestres": "QS",
+    "Années": "YS"
+}
 
 def export_results_to_excel(analyzer, fleet_estimator):
     output = io.BytesIO()
@@ -161,7 +166,7 @@ def get_cost_options():
 
 def display_data_analysis():
     st.subheader("Aperçu des données")
-    st.table(st.session_state.app_state['analyzer'].df_original.head())
+    st.table(st.session_state.app_state['analyzer'].df_original.head(8))
     st.write(f"Nombre total d'enregistrements: {len(st.session_state.app_state['analyzer'].df)}")
     st.write(f"Période couverte: du {st.session_state.app_state['analyzer'].df['ds'].min()} au {st.session_state.app_state['analyzer'].df['ds'].max()}")
     
@@ -241,19 +246,30 @@ def main_excel():
             #Frequence de la prédiction
             col1, col2 = st.columns(2)
             with col1:
-                st.session_state.app_state['analyzer'].model_components['freq'] = "D" if st.radio("Choisisez la période de prédiction", OPTION_FREQ)=="Jours" else "MS"
+                selected_freq = st.selectbox("Choisissez la période de prédiction", list(OPTION_FREQ.keys()))
+                st.session_state.app_state['analyzer'].model_components['freq'] = OPTION_FREQ[selected_freq]
             with col2:
-                if st.session_state.app_state['analyzer'].model_components['freq']=="D":
-                    st.write("Les prédictions se font par jours")
-                elif st.session_state.app_state['analyzer'].model_components['freq']=="MS":
-                    st.write("Les prédictions se font par mois")
-                else:
-                    st.error("probably my bad")
+                st.write(f"Les prédictions se font par {selected_freq.lower()}")
 
+            # Ajuster le nombre de périodes futures en fonction de la fréquence sélectionnée
+            if selected_freq == "Jours":
+                future_periods_max = 1000
+            elif selected_freq == "Semaines":
+                future_periods_max = 200
+            elif selected_freq == "Mois":
+                future_periods_max = 60
+            elif selected_freq == "Trimestres":
+                future_periods_max = 20
+            else:  # Années
+                future_periods_max = 10
 
-            st.session_state.app_state['analyzer'].model_params['future_periods'] = st.slider("Nombre d'étapes futures à prédire", 
-                                                                min_value=10, max_value=1000, 
-                                                                value=st.session_state.app_state['analyzer'].model_params['future_periods'])
+            st.session_state.app_state['analyzer'].model_params['future_periods'] = st.slider(
+                f"Nombre de {selected_freq.lower()} futurs à prédire", 
+                min_value=10, 
+                max_value=future_periods_max, 
+                value=min(st.session_state.app_state['analyzer'].model_params['future_periods'], future_periods_max)
+            )
+
             st.session_state.app_state['analyzer'].model_params['epochs'] = st.slider("Nombre d'époques", 
                                                         min_value=10, max_value=300, 
                                                         value=st.session_state.app_state['analyzer'].model_params['epochs'])
